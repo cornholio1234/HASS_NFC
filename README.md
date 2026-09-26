@@ -5,8 +5,8 @@ Spotify auf einem ausgewählten Lautsprecher. Home Assistant verwaltet die Karte
 und ordnet jedem Reader ein Spotify-Konto und einen Lautsprecher zu.
 
 Das Projekt ist ein funktionierender Eigenbau, kein fertiges Plug-and-play-Produkt.
-Die Oberfläche ist deutsch. **Das 3D-Gehäuse ist noch ein Prototyp mit bekannten
-mechanischen Schwächen – bitte vor dem Drucken den Gehäuseabschnitt lesen.**
+Die Oberfläche ist deutsch. **Das 3D-Gehäuse rC ist ein mechanisch überarbeiteter,
+noch nicht physisch erprobter Prototyp – bitte die Druckhinweise lesen.**
 
 ## Was funktioniert?
 
@@ -168,24 +168,24 @@ Link zu Spotify, rotes × zum Entfernen der Zuordnung. **Löschen rückgängig**
 im selben Browser; die Karte selbst wird weder beschrieben noch gelöscht.
 **Karten prüfen** zeigt UID und Titel, ohne Musik zu starten.
 
-## 3D-Gehäuse: bekannter Prototyp
+## 3D-Gehäuse rC
 
-![Gehäuseentwurf rB](enclosure/rB/ansicht.png)
+![Gehäuseentwurf rC](enclosure/rC/ansicht.png)
 
 70 × 50 × 60 mm, Display vorne, Kartenleser oben, PLA, ohne Schrauben.
-[CAD, STL und Druckhinweise für rB](enclosure/rB/LESEN.md) sind enthalten;
-r0/rA bleiben als ältere Entwürfe nachvollziehbar.
+[CAD, STL und Montage-/Druckhinweise für rC](enclosure/rC/LESEN.md).
 
-**Der physische Test von rB hat folgende Probleme gezeigt:**
+Der physische rB-Test zeigte abbrechende Displaystützen, zu schwache Rastnasen
+und ein wippendes Display. rC ersetzt diese durch breite, an den Seitenwänden
+verwurzelte Führungen, einen durchgehenden Displaysockel, austauschbare Passleisten
+in drei Dicken und vier massive Steckriegel für die obere und untere Rückwand.
+USB-Ausschnitt nur rechts, von vorne gesehen; links geschlossen.
 
-- Displaystützen brechen leicht ab.
-- Rastmechanismus hält zu schwach.
-- Rückwand wird unzureichend gehalten.
-- Display hat Spiel nach hinten und wippt.
-
-Die STL-Prüfung auf geschlossene Netze war erfolgreich, ersetzt aber keine
-mechanische Erprobung. **rC mit stabileren Auflagen, besserer Rückwandführung und
-justierbarer Displayklemmung ist bisher nur geplant, nicht konstruiert.**
+Alle Druckteile sind auf geschlossene Netze geprüft. Der Einschub ist in 101
+Positionen rechnerisch kollisionsfrei; nominale Glas-/Platinenhüllen passen.
+Kurze Brücken an den Riegellöchern bleiben. **Ein realer rC-Druck und eine
+mechanische Erprobung stehen noch aus.** rB/rA/r0 bleiben als ältere Entwürfe
+enthalten. rC-Gehäuse und -Einschub zusammen drucken, ältere Teile passen nicht dazu.
 
 ## Grenzen und Fehlerbehebung
 

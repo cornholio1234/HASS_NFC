@@ -1,0 +1,95 @@
+{
+  "gehaeuse.stl": {
+    "watertight": true,
+    "consistent_winding": true,
+    "bodies": 1,
+    "extents_mm": [
+      70.0,
+      60.0,
+      50.0
+    ],
+    "volume_mm3": 23856.17518821058,
+    "downward_area_above_first_layer_mm2": 21.319999999999958
+  },
+  "einschub.stl": {
+    "watertight": true,
+    "consistent_winding": true,
+    "bodies": 1,
+    "extents_mm": [
+      65.4,
+      47.7,
+      57.600000381470004
+    ],
+    "volume_mm3": 20666.46319002619,
+    "downward_area_above_first_layer_mm2": 87.96000000000018
+  },
+  "riegel.stl": {
+    "watertight": true,
+    "consistent_winding": true,
+    "bodies": 4,
+    "extents_mm": [
+      41.0,
+      8.0,
+      2.9
+    ],
+    "volume_mm3": 498.21860799999996,
+    "downward_area_above_first_layer_mm2": 0.0
+  },
+  "riegel-lose.stl": {
+    "watertight": true,
+    "consistent_winding": true,
+    "bodies": 4,
+    "extents_mm": [
+      41.0,
+      8.0,
+      2.9
+    ],
+    "volume_mm3": 490.38837600000005,
+    "downward_area_above_first_layer_mm2": 0.0
+  },
+  "klemmleisten-normal.stl": {
+    "watertight": true,
+    "consistent_winding": true,
+    "bodies": 2,
+    "extents_mm": [
+      8.6000214441,
+      36.3,
+      3.54999
+    ],
+    "volume_mm3": 437.05109630452233,
+    "downward_area_above_first_layer_mm2": 0.0
+  },
+  "klemmleisten-eng.stl": {
+    "watertight": true,
+    "consistent_winding": true,
+    "bodies": 2,
+    "extents_mm": [
+      8.6000214441,
+      36.3,
+      3.69999858307
+    ],
+    "volume_mm3": 467.5448489345661,
+    "downward_area_above_first_layer_mm2": 0.0
+  },
+  "klemmleisten-lose.stl": {
+    "watertight": true,
+    "consistent_winding": true,
+    "bodies": 2,
+    "extents_mm": [
+      8.6000214441,
+      36.3,
+      3.39999572205
+    ],
+    "volume_mm3": 406.5601499799955,
+    "downward_area_above_first_layer_mm2": 0.0
+  },
+  "closed_body_drawer_overlap_mm3": 0.0,
+  "drawer_travel_101_positions_max_overlap_mm3": 0.0,
+  "glass_body_drawer_overlap_mm3": 0.0,
+  "display_pcb_body_drawer_overlap_mm3": 0.0,
+  "rfid_pcb_body_drawer_overlap_mm3": 0.0,
+  "left_strip_0_body_overlap_mm3": 2.7433194939400587e-06,
+  "left_strip_0.15_body_overlap_mm3": 2.7433186602365822e-06,
+  "left_strip_0.3_body_overlap_mm3": 2.633321655546676e-07,
+  "limits": "Nominal hardware envelopes only. No physical fit, strength or slicer validation."
+}
