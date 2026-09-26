@@ -69,6 +69,9 @@ class InstallerTest(unittest.IsolatedAsyncioTestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             await install.install(self.url, 'fake-test-token')
             self.assertEqual(len(self.scripts), 4)
+            self.assertEqual(self.dashboards[0]['url_path'], 'nfc-cards')
+            self.assertEqual(self.dashboard_config['title'], 'NFC Cards')
+            self.assertEqual(self.dashboard_config['views'][0]['path'], 'enroll')
             self.assertEqual(self.scripts['nfc_jukebox_play_card']['variables']['card_map'], {})
             self.assertEqual(self.scripts['nfc_jukebox_reader_config']['variables']['profiles'], {})
             self.scripts['nfc_jukebox_play_card']['variables']['card_map']['USER'] = {'name': 'Keep this'}

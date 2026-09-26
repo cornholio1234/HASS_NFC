@@ -6,14 +6,14 @@ import trimesh
 
 root = Path(__file__).resolve().parent
 results = {}
-for name in ('gehaeuse.stl', 'einschub.stl'):
+for name in ('body.stl', 'drawer.stl'):
     mesh = trimesh.load(root / name)
     assert mesh.is_watertight, name
     assert mesh.is_winding_consistent, name
     assert mesh.body_count == 1, name
     assert mesh.volume > 0, name
     assert mesh.bounds[0, 2] >= -1e-5, name
-    if name == 'gehaeuse.stl':
+    if name == 'body.stl':
         assert np.allclose(mesh.extents, [70, 60, 50]), mesh.extents
         # Geometric screen only: not a slicer simulation or print validation.
         # Ignore the first layer and numerical noise around exactly 45 degrees.
@@ -27,7 +27,7 @@ for name in ('gehaeuse.stl', 'einschub.stl'):
         'bounds_mm': mesh.bounds.tolist(),
         'volume_mm3': float(mesh.volume),
     }
-    if name == 'gehaeuse.stl':
+    if name == 'body.stl':
         results[name]['downward_area_steeper_than_45deg_above_first_layer_mm2'] = overhang_area
 (root / 'mesh-check.json').write_text(json.dumps(results, indent=2), encoding='utf-8')
 print(json.dumps(results, indent=2))

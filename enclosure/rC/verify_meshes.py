@@ -5,23 +5,23 @@ import numpy as np
 import trimesh
 root = Path(__file__).resolve().parent
 results = {}
-expected = {'gehaeuse.stl':1,'einschub.stl':1,'riegel.stl':4,'riegel-lose.stl':4,
-            'klemmleisten-normal.stl':2,'klemmleisten-eng.stl':2,'klemmleisten-lose.stl':2}
+expected = {'body.stl':1,'drawer.stl':1,'keys.stl':4,'keys-loose.stl':4,
+            'clamp-strips-normal.stl':2,'clamp-strips-tight.stl':2,'clamp-strips-loose.stl':2}
 for name, count in expected.items():
     m = trimesh.load(root/name)
     assert m.is_watertight and m.is_winding_consistent, name
     assert m.body_count == count, (name, m.body_count)
     assert all(p.volume > 0 for p in m.split()), name
     assert abs(m.bounds[0,2]) < 1e-5, (name, m.bounds)
-    if name == 'gehaeuse.stl':
+    if name == 'body.stl':
         assert np.allclose(m.extents,[70,60,50]), m.extents
     down=(m.face_normals[:,2] < -0.708)&(m.triangles_center[:,2] > .21)
     results[name]={'watertight':True,'consistent_winding':True,'bodies':int(m.body_count),
       'extents_mm':m.extents.tolist(),'volume_mm3':float(m.volume),
       'downward_area_above_first_layer_mm2':float(m.area_faces[down].sum())}
 # Transform exports back into assembly coordinates.
-b=trimesh.load(root/'gehaeuse.stl'); b.vertices=np.column_stack((b.vertices[:,0],b.vertices[:,2],60-b.vertices[:,1]))
-d=trimesh.load(root/'einschub.stl');d.apply_translation([0,0,.9])
+b=trimesh.load(root/'body.stl'); b.vertices=np.column_stack((b.vertices[:,0],b.vertices[:,2],60-b.vertices[:,1]))
+d=trimesh.load(root/'drawer.stl');d.apply_translation([0,0,.9])
 inter=trimesh.boolean.intersection([b,d],engine='manifold')
 assert abs(inter.volume)<1e-6, inter.volume
 results['closed_body_drawer_overlap_mm3']=float(inter.volume)
@@ -44,7 +44,7 @@ for label, extents, origin in [('glass',[58.8,1.1,37.1],[5.6,2,11.45]),
     results[label+'_body_drawer_overlap_mm3']=float(v)
 # Narrow sloped strips meet the retaining rails, not the narrower PCB.
 for fit in [0,.15,.30]:
-    s=trimesh.load(root/('klemmleisten-'+{0:'eng',.15:'normal',.30:'lose'}[fit]+'.stl'))
+    s=trimesh.load(root/('clamp-strips-'+{0:'tight',.15:'normal',.30:'loose'}[fit]+'.stl'))
     # First strip is printed at X 0..2.8. Test it then its mirrored copy.
     a=min(s.split(),key=lambda x:x.bounds[0,0])
     a.vertices=np.column_stack((a.vertices[:,0]+5.8,a.vertices[:,2]+3.1+fit,48.15-a.vertices[:,1]))

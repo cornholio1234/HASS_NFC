@@ -87,17 +87,18 @@ async def install(url, token):
                 command["resource_id"] = existing["id"]
             await call(command)
             dashboards = await call({"type": "lovelace/dashboards/list"})
-            if not any(d["url_path"] == "nfc-karten" for d in dashboards):
-                await call({"type": "lovelace/dashboards/create", "url_path": "nfc-karten",
-                            "title": "NFC Karten", "icon": "mdi:cards", "require_admin": True,
+            existing_dashboard = next((d for d in dashboards if d["url_path"] in ("nfc-cards", "nfc-karten")), None)
+            if not existing_dashboard:
+                await call({"type": "lovelace/dashboards/create", "url_path": "nfc-cards",
+                            "title": "NFC Cards", "icon": "mdi:cards", "require_admin": True,
                             "show_in_sidebar": True})
-                await call({"type": "lovelace/config/save", "url_path": "nfc-karten",
+                await call({"type": "lovelace/config/save", "url_path": "nfc-cards",
                             "config": json.loads((folder / "dashboard.json").read_text(encoding="utf-8-sig"))})
-                print("Created NFC Karten dashboard.")
+                print("Created NFC Cards dashboard.")
             else:
-                print("Keeping existing NFC Karten dashboard.")
-        print("Ready:", url + "/nfc-karten/anlernen")
-        print("Add your reader/account/speaker under Konfiguration. No example mappings were installed.")
+                print("Keeping existing NFC Cards dashboard.")
+        print("Ready:", url + "/" + existing_dashboard["url_path"] if existing_dashboard else url + "/nfc-cards/enroll")
+        print("Add your reader/account/speaker under Configuration. No example mappings were installed.")
 
 
 def main():

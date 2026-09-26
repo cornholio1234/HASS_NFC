@@ -1,222 +1,227 @@
 # HASS NFC Jukebox
 
-**Karte auflegen, Hörbuch oder Musik hören.** Ein ESP32 mit NFC-Leser startet
-Spotify auf einem ausgewählten Lautsprecher. Home Assistant verwaltet die Karten
-und ordnet jedem Reader ein Spotify-Konto und einen Lautsprecher zu.
+**Scan a card. Play an audiobook or music.** An ESP32 with an NFC reader starts
+Spotify on your chosen speaker. Home Assistant manages the cards and pairs each
+reader with a Spotify account and speaker.
 
-Das Projekt ist ein funktionierender Eigenbau, kein fertiges Plug-and-play-Produkt.
-Die Oberfläche ist deutsch. **Das 3D-Gehäuse rC ist ein mechanisch überarbeiteter,
-noch nicht physisch erprobter Prototyp – bitte die Druckhinweise lesen.**
+This is a working DIY project, not a finished plug-and-play product. The published
+firmware, dashboard and documentation are in English. **The rC enclosure is a
+mechanically revised prototype that has not been physically tested. Read the
+printing instructions before printing it.**
 
-## Was funktioniert?
+## Features
 
-- Spotify-Alben, Playlists und einzelne Titel einer NFC-Karte zuordnen.
-- Mehrere Karten als Stapel anlernen; Namen beim Start automatisch von Spotify laden.
-- Gemeinsame Kartenbibliothek für mehrere Reader mit getrennten Konten/Lautsprechern.
-- Karten suchen, sortieren, umbenennen, prüfen und Zuordnungen löschen/wiederherstellen.
-- Hörbuch-Markierung: Shuffle wird vor dem Start aktiv ausgeschaltet und kontrolliert.
-- Touchdisplay mit Titel, Interpret, Cover, Fortschritt, Play/Pause, Vor/Zurück und Seek.
-- Native Home-Assistant-Seite mit **Anlernen | Gespeicherte Karten | Konfiguration**.
+- Assign Spotify albums, playlists and individual tracks to NFC cards.
+- Enroll cards in batches; fetch Spotify titles automatically when enrollment starts.
+- Share one card library across readers with separate accounts and speakers.
+- Search, sort, rename and inspect cards; delete and restore mappings.
+- Mark audiobooks: shuffle is actively turned off and verified before playback.
+- Touchscreen with title, artist, cover, progress, play/pause, previous/next and seeking.
+- Native Home Assistant dashboard: **Enroll | Saved cards | Configuration**.
+- Firmware includes a 60-second backlight timeout and wake by touch, movement or
+  a new card scan. The wake gesture does not trigger playback controls. This
+  addition has compiled successfully; physical verification is pending.
 
-**Music Assistant ist nicht erforderlich.** Die Steuerung verwendet die native
-Spotify-Integration von Home Assistant und Spotify Connect. Der Computer wird nur
-für die Einrichtung gebraucht, nicht für den laufenden Betrieb.
+**Music Assistant is not required.** Playback uses Home Assistant's native Spotify
+integration and Spotify Connect. A computer is needed for setup, not daily operation.
 
-## Hardware und Voraussetzungen
+## Hardware and requirements
 
-Der enthaltene Firmware-Entwurf ist für:
+The included firmware targets this hardware:
 
-| Bauteil | Verwendetes Modell |
+| Component | Model used |
 |---|---|
-| Display/Controller | Waveshare ESP32-S3-Touch-LCD-2, ST7789, CST816D |
-| NFC-Leser | RC522 / MFRC522 über SPI, Versorgung mit 3,3 V |
-| Karten | RC522-kompatible 13,56-MHz-Karten/Tags, z. B. MIFARE Classic |
-| Lautsprecher | Ein im gewählten Spotify-Konto verfügbares Spotify-Connect-Gerät |
-| Steuerzentrale | Home Assistant mit nativer Spotify-Integration und ESPHome |
+| Display/controller | Waveshare ESP32-S3-Touch-LCD-2, ST7789, CST816D |
+| Motion sensor | Onboard QMI8658, I²C address 0x6B |
+| NFC reader | RC522 / MFRC522 over SPI, powered at 3.3 V |
+| Cards | RC522-compatible 13.56 MHz cards/tags, such as MIFARE Classic |
+| Speaker | A Spotify Connect device available to the selected account |
+| Controller | Home Assistant with native Spotify integration and ESPHome |
 
-Entwickelt mit **ESPHome 2026.9.0**. Andere Displayplatinen, Touchcontroller und
-RC522-Varianten sind nicht automatisch kompatibel. Die Kartenkennungen müssen
-im Format `AA-BB-CC-DD` vorliegen (4–10 Bytes); beliebige UUID-Tags sind nicht
-abgedeckt. Spotify-Wiedergabesteuerung setzt ein geeignetes Premium-Konto voraus.
-Für unabhängige gleichzeitige Wiedergabe mehrere Spotify-Konten verwenden.
+Developed with **ESPHome 2026.9.0**. Other display boards, touch controllers and
+RC522 variants are not automatically compatible. Card IDs must use the format
+`AA-BB-CC-DD` (4–10 bytes); arbitrary UUID tags are not supported. Spotify playback
+control requires an appropriate Premium account. Use separate accounts for
+independent simultaneous playback.
 
-## Verkabelung
+## Wiring
 
-Diese Pins gelten für die oben genannte Waveshare-Platine:
+These pins apply to the Waveshare board listed above:
 
-| RC522 | ESP32 GPIO / Anschluss | Kabelfarbe im ursprünglichen Aufbau |
+| RC522 | ESP32 GPIO / connector | Wire color in the original build |
 |---|---|---|
 | SDA / SS | GPIO11 | Orange |
-| SCK | GPIO14 | Grün |
-| MOSI | GPIO13 | Rot |
-| MISO | GPIO12 | Gelb |
-| RST | GPIO15 | Blau |
-| GND | GND | Schwarz |
-| 3.3V | 3V3 | Weiß |
-| IRQ | Nicht verbunden | – |
+| SCK | GPIO14 | Green |
+| MOSI | GPIO13 | Red |
+| MISO | GPIO12 | Yellow |
+| RST | GPIO15 | Blue |
+| GND | GND | Black |
+| 3.3V | 3V3 | White |
+| IRQ | Not connected | – |
 
-**SDA ist hier der SPI-Chip-Select, kein I²C-Anschluss.** RC522 mit 3,3 V betreiben.
-Die Farben sind nur eine Merkhilfe; maßgeblich sind die Pinbeschriftungen.
-Die verwendeten Pins dürfen nicht gleichzeitig für eine Kamera verwendet werden.
+**SDA is the SPI chip-select here, not an I²C connection.** Power the RC522 at 3.3 V.
+Colors are only a reference; follow the pin labels. These pins cannot be shared
+with a connected camera.
 
-## Einrichtung
+## Setup
 
-### 1. Spotify in Home Assistant einrichten
+### 1. Set up Spotify in Home Assistant
 
-Richte die [native Spotify-Integration](https://www.home-assistant.io/integrations/spotify/)
-für jedes gewünschte Konto ein. Prüfe zuerst in Home Assistant, dass dessen
-`media_player` vorhanden ist und der Ziellautsprecher in der Quellenliste erscheint.
-Falls Spotify den Lautsprecher noch nicht kennt, wähle ihn einmal in Spotify Connect.
-Die jeweils aktuellen OAuth-/Developer-App-Vorgaben stehen in der verlinkten Anleitung.
+Configure the [native Spotify integration](https://www.home-assistant.io/integrations/spotify/)
+for each account you want to use. First check that its `media_player` exists in
+Home Assistant and that the target speaker appears in its source list. If Spotify
+does not know the speaker yet, select it once in Spotify Connect. Current OAuth
+and developer-app requirements are covered by the linked integration guide.
 
-### 2. Home-Assistant-Dateien kopieren
+### 2. Copy the Home Assistant files
 
-1. Aktiviere [Packages](https://www.home-assistant.io/docs/configuration/packages/),
-   falls noch nicht vorhanden. In `configuration.yaml` unter dem vorhandenen
-   `homeassistant:`-Abschnitt ergänzen, **keinen zweiten Abschnitt anlegen**:
+1. Enable [packages](https://www.home-assistant.io/docs/configuration/packages/)
+   if needed. Add the following beneath the existing `homeassistant:` section in
+   `configuration.yaml`; **do not create a second section**:
 
    ```yaml
    homeassistant:
      packages: !include_dir_named packages
    ```
 
-2. Kopiere [nfc_spotify.yaml](home_assistant/packages/nfc_spotify.yaml) nach
+2. Copy [nfc_spotify.yaml](home_assistant/packages/nfc_spotify.yaml) to
    `/config/packages/nfc_spotify.yaml`.
-3. Kopiere [nfc-card-enroller.js](home_assistant/nfc_spotify/nfc-card-enroller.js)
-   nach `/config/www/nfc/nfc-card-enroller.js`.
-4. Die Skripte müssen über die HA-Skriptverwaltung gespeichert werden können.
-   Die übliche Einbindung lautet `script: !include scripts.yaml`.
-5. Prüfe die HA-Konfiguration. Wenn Packages gerade erst aktiviert wurden,
-   starte Home Assistant einmal neu.
+3. Copy [nfc-card-enroller.js](home_assistant/nfc_spotify/nfc-card-enroller.js) to
+   `/config/www/nfc/nfc-card-enroller.js`.
+4. Scripts must be writable through Home Assistant's script configuration API.
+   The usual configuration is `script: !include scripts.yaml`.
+5. Validate the Home Assistant configuration. If packages were just enabled,
+   restart Home Assistant once.
 
-### 3. Skripte und Dashboard installieren
+### 3. Install scripts and the dashboard
 
-Auf deinem Computer: Python 3.10+ installieren, Repository herunterladen und im
-Repository-Verzeichnis ausführen:
+Install Python 3.10+ on your computer, download this repository, and run from its
+root directory:
 
 ```sh
 python -m pip install -r tools/requirements.txt
 python tools/install.py --url http://homeassistant.local:8123
 ```
 
-Verwende deine erreichbare HA-Adresse. Der Helfer fragt verdeckt nach einem
-langfristigen Zugriffstoken eines HA-Administrators. Er benötigt den Token nur
-während der Installation und speichert ihn nicht. Alternativ sind `HA_URL` und
-`HA_TOKEN` als Umgebungsvariablen möglich.
+Use your reachable Home Assistant address. The helper prompts privately for a
+long-lived access token belonging to a Home Assistant administrator. It uses the
+token only during installation and does not save it. Alternatively, set `HA_URL`
+and `HA_TOKEN` environment variables.
 
-Der Helfer erstellt die vier fehlenden Skripte, lädt die Konfiguration neu und
-legt das Dashboard **NFC Karten** an. Bereits vorhandene Skripte und Dashboard-
-Inhalte werden nicht überschrieben. Kartenbibliothek und Reader-Profile starten
-leer. Aufruf danach: `/nfc-karten/anlernen`.
+The helper creates the four missing scripts, reloads the configuration and creates
+the **NFC Cards** dashboard. Existing scripts and dashboard contents are preserved.
+The card library and reader profiles start empty. Open `/nfc-cards/enroll`.
+Existing dashboards, including legacy routes, are preserved by the installer.
 
-Das ist ein **Erstinstallationshelfer**, kein Migrationsprogramm: Bestehende
-Installationen vor einem Versionswechsel sichern und Änderungen prüfen.
+This is a **first-install helper**, not a migration tool. Back up existing
+installations and review changes before updating.
 
-### 4. ESPHome-Panel einrichten
+### 4. Set up the ESPHome panel
 
-1. Kopiere `esphome/nfc_spotify_player.yaml` und `esphome/components/` in dein
-   ESPHome-Konfigurationsverzeichnis; der relative Komponentenpfad muss passen.
-2. Übernimm die Einträge aus [secrets.example.yaml](esphome/secrets.example.yaml)
-   in deine lokale `secrets.yaml`: WLAN, API-Verschlüsselungsschlüssel, OTA-Passwort.
-   Die echte Datei niemals veröffentlichen.
-3. Passe oben in der YAML `device_name`, `friendly_name` und
-   `home_assistant_url` an. Die HA-Adresse muss **vom ESP erreichbar** sein.
-4. Ersten Flash über USB durchführen und das Gerät in Home Assistant über ESPHome
-   hinzufügen. Den konfigurierten API-Schlüssel verwenden.
-5. Öffne das Gerät in HA: Die URL endet auf `/config/devices/device/<ID>`.
-   Diese **HA-Geräte-ID** kommt in die Firmware-Substitution `reader_id`.
-   Sie ist weder die MAC-Adresse noch die Karten-UID. Firmware danach erneut laden.
-6. Aktiviere beim ESPHome-Gerät in HA die Option, **Home-Assistant-Aktionen
-   auszuführen**; sonst können Kartenscans/Tasten keine HA-Aktionen auslösen.
+1. Copy `esphome/nfc_spotify_player.yaml` and `esphome/components/` into your ESPHome
+   configuration directory, preserving the relative component path.
+2. Copy the entries in [secrets.example.yaml](esphome/secrets.example.yaml) into
+   your local `secrets.yaml`: Wi-Fi credentials, API encryption key and OTA password.
+   Never publish the real secrets file.
+3. Adjust `device_name`, `friendly_name` and `home_assistant_url` at the top of the
+   YAML. The Home Assistant address must be **reachable from the ESP**.
+4. Flash over USB initially and add the device to Home Assistant through ESPHome,
+   using the configured API key.
+5. Open the device in Home Assistant. Its URL ends in `/config/devices/device/<ID>`.
+   Put this **Home Assistant device ID** into the firmware's `reader_id` substitution.
+   It is neither the MAC address nor a card UID. Flash the updated firmware.
+6. In the ESPHome device options in Home Assistant, enable **Allow the device to
+   perform Home Assistant actions**. Otherwise scans and buttons cannot call actions.
 
-Ein weiterer identischer Display-Reader braucht einen eigenen Gerätenamen und
-seine eigene `reader_id`. Spätere Konto-/Lautsprecherwechsel erfolgen im Dashboard
-und brauchen keinen weiteren Flash. Andere NFC-Reader ohne Display können genutzt
-werden, wenn sie passende `tag_scanned`-Events mit ihrer HA-Geräte-ID senden.
+Each additional identical display reader needs a unique device name and its own
+`reader_id`. Later account/speaker changes happen in the dashboard without flashing.
+Other NFC readers without displays can be used if they send compatible
+`tag_scanned` events with their Home Assistant device ID.
 
-### 5. Reader koppeln
+### 5. Pair a reader
 
-Unter **NFC Karten → Konfiguration → Weiteren Reader koppeln**:
+Open **NFC Cards → Configuration → Pair another reader**:
 
-1. NFC-Lesegerät auswählen und benennen.
-2. Spotify-Player/Konto auswählen.
-3. Ziellautsprecher auswählen.
-4. Standardtyp für neue Karten und Shuffle-Verhalten für Musik einstellen.
-5. **Kopplung speichern**.
+1. Select the NFC reader and give it a name.
+2. Select the Spotify player/account.
+3. Select the target speaker.
+4. Choose the default type for new cards and shuffle behavior for music.
+5. Click **Save pairing**.
 
-Fehlt der Reader in der Auswahl, scanne einmal eine Karte damit und lade die
-Seite neu. Ein Reader ohne Profil startet keine Musik. Dieselbe Karte spielt an
-verschiedenen Readern denselben Inhalt über deren jeweilige Kopplung.
+If a reader is missing, scan a card with it and reload the page. A reader without
+a profile does not start playback. The same card plays the same content on different
+readers through each reader's account/speaker pairing.
 
-## Karten anlernen und verwalten
+## Enroll and manage cards
 
-1. Oben den gewünschten Reader auswählen.
-2. In **Anlernen** einen Spotify-Link pro Zeile einfügen.
-3. **Anlernen starten** lädt die Namen. Optional ersetzt `Eigener Titel | Link`
-   den Spotify-Namen. Ein Albumlink startet das ganze Album, nicht nur den darin
-   markierten `highlight`-Titel.
-4. Karten nacheinander auflegen und jeweils wieder abnehmen. Den Typ pro Eintrag
-   bei Bedarf auf **Hörbuch** ändern.
-5. **Stapel speichern**, sobald alle Einträge eine UID haben.
+1. Select the intended reader at the top.
+2. In **Enroll**, paste one Spotify link per line.
+3. **Start enrollment** fetches titles. Optionally use `Custom title | Link` to
+   override Spotify's title. Album links start the whole album, not just a track
+   selected by the URL's `highlight` parameter.
+4. Scan cards one at a time, removing each card between scans. Set an item's type
+   to **Audiobook** when appropriate.
+5. Click **Save batch** once every item has a UID.
 
-Während des Anlernens starten Scans dieses Readers keine Wiedergabe. Andere Reader
-bleiben nutzbar. Der Entwurf bleibt beim Beenden und Tabwechsel erhalten.
-Bereits gespeicherte Karten werden nur nach ausdrücklicher Neuzuordnung ersetzt.
+Scans from this reader do not start playback during enrollment. Other readers
+remain available. Drafts survive stopping and switching tabs. Previously saved
+cards are replaced only through explicit reassignment.
 
-In **Gespeicherte Karten**: Suche nach UID/Titel/Typ, Sortierung, Stift zum Umbenennen,
-Link zu Spotify, rotes × zum Entfernen der Zuordnung. **Löschen rückgängig** gilt
-im selben Browser; die Karte selbst wird weder beschrieben noch gelöscht.
-**Karten prüfen** zeigt UID und Titel, ohne Musik zu starten.
+In **Saved cards**, search by UID/title/type, sort, use the pencil to rename, open
+Spotify with the link icon, or remove a mapping with the red ×. **Undo deletion**
+works in the same browser. The physical card is neither written nor erased.
+**Inspect cards** shows IDs and titles without starting playback.
 
-## 3D-Gehäuse rC
+## 3D enclosure rC
 
-![Gehäuseentwurf rC](enclosure/rC/ansicht.png)
+![Enclosure rC](enclosure/rC/preview.png)
 
-70 × 50 × 60 mm, Display vorne, Kartenleser oben, PLA, ohne Schrauben.
-[CAD, STL und Montage-/Druckhinweise für rC](enclosure/rC/LESEN.md).
+70 × 50 × 60 mm (width × depth × height), display at the front, reader at the top,
+PLA, no screws. [CAD, STLs and assembly/printing instructions](enclosure/rC/README.md).
 
-Der physische rB-Test zeigte abbrechende Displaystützen, zu schwache Rastnasen
-und ein wippendes Display. rC ersetzt diese durch breite, an den Seitenwänden
-verwurzelte Führungen, einen durchgehenden Displaysockel, austauschbare Passleisten
-in drei Dicken und vier massive Steckriegel für die obere und untere Rückwand.
-USB-Ausschnitt nur rechts, von vorne gesehen; links geschlossen.
+Physical testing of rB revealed fragile display supports, weak catches and a rocking
+display. rC uses broad guides rooted in the side walls, a continuous display support,
+replaceable clamp strips in three thicknesses, and four solid locking keys securing
+the upper and lower rear panel. The USB opening is on the right when viewed from
+the front; the left side is closed.
 
-Alle Druckteile sind auf geschlossene Netze geprüft. Der Einschub ist in 101
-Positionen rechnerisch kollisionsfrei; nominale Glas-/Platinenhüllen passen.
-Kurze Brücken an den Riegellöchern bleiben. **Ein realer rC-Druck und eine
-mechanische Erprobung stehen noch aus.** rB/rA/r0 bleiben als ältere Entwürfe
-enthalten. rC-Gehäuse und -Einschub zusammen drucken, ältere Teile passen nicht dazu.
+All printable meshes are watertight. The drawer is collision-free at 101 sampled
+positions, and nominal glass/PCB envelopes fit. Short bridges remain at the key
+holes. **An actual rC print and mechanical testing are still pending.** Older
+rB/rA/r0 designs are retained for reference. Print the rC body and drawer together;
+older parts are not compatible.
 
-## Grenzen und Fehlerbehebung
+## Limitations and troubleshooting
 
-- Nur ein physischer Reader wurde bisher erprobt. Mehrere Profile, die getrennten
-  Anlernsperren und die Zuordnungslogik sind implementiert/getestet; gleichzeitige
-  Wiedergabe mit zwei echten Readern ist noch nicht praktisch verifiziert.
-- Spotify/HA-Rückmeldungen sind nicht verzögerungsfrei. Die Fortschrittsanzeige
-  rechnet zwischen Positionsmeldungen lokal weiter.
-- Der lokale Touch-Treiber filtert unplausible Rohwerte. Er behebt nicht nachweislich
-  deren elektrische Ursache und erkennt nicht jeden möglichen Ghost-Touch.
-- Keine automatische Hörbuch-Fortsetzung über mehrere Kartenwechsel hinweg.
-- Fehlende Lautsprecher: zuerst Konto und Spotify-Connect-Verfügbarkeit prüfen.
-- Kein Scan: Stromversorgung, SPI-Verkabelung und ESPHome-Logs prüfen; anschließend
-  Geräte-ID und Reader-Profil. Keine beliebigen 125-kHz-Tags verwenden.
-- Veraltete Oberfläche: Browser neu laden. Bei Updates muss der Ressourcen-URL
-  ein neuer Versionsparameter mitgegeben werden; der Installationshelfer tut dies.
-- Ein abgebrochener Anlernmodus läuft spätestens nach 90 Sekunden aus.
-- Gleichzeitiges Speichern aus mehreren Admin-Seiten vermeiden; die HA-Konfigurations-
-  API bietet keine atomare Versionsprüfung.
+- Only one physical reader has been tested. Multiple profiles, per-reader enrollment
+  locks and routing are implemented/tested, but simultaneous playback with two
+  physical readers has not been verified.
+- Spotify/Home Assistant feedback has latency. Progress is extrapolated locally
+  between position updates.
+- The local touch driver filters implausible raw values. It does not establish or
+  fix their electrical cause, and cannot reject every possible ghost touch.
+- The backlight timeout/motion wake addition is compiled but not yet tested on the
+  device. Motion sensitivity is a provisional 0.18 g deviation from a moving baseline.
+- No automatic audiobook resume across card changes.
+- Missing speakers: check the account and Spotify Connect availability first.
+- No scans: check power, SPI wiring and ESPHome logs, then the device ID and reader
+  profile. Arbitrary 125 kHz tags are not supported.
+- Stale dashboard: reload the browser. Updates need a new resource URL version
+  parameter; the installation helper supplies one.
+- An abandoned enrollment lock expires within 90 seconds.
+- Avoid simultaneous saves from multiple admin pages. The Home Assistant
+  configuration API does not offer atomic version checks.
 
-## Entwicklung, Aufbau und Lizenz
+## Development, architecture and license
 
 ```sh
 node home_assistant/nfc_spotify/test_card.cjs
 python -m unittest discover -s tools -p "test_*.py"
 ```
 
-[Architektur und Datenablage](docs/ARCHITECTURE.md) ·
-[MIT-Lizenz](LICENSE) · [Drittanbieter-Lizenzen](THIRD_PARTY_NOTICES.md)
+[Architecture and storage](docs/ARCHITECTURE.md) ·
+[MIT license](LICENSE) · [Third-party licenses](THIRD_PARTY_NOTICES.md)
 
-Eigener Projektcode, Dokumentation und CAD stehen unter MIT. **Ausnahme:** Der
-übernommene ESPHome-C++-Touch-Treiber bleibt GPLv3; dessen Python-Dateien sind MIT.
-Es werden keine Zugangsdaten, privaten Kartenlisten oder vorkompilierten
-Firmwaredateien mitgeliefert.
+Original project code, documentation and CAD use the MIT license. **Exception:**
+the vendored ESPHome C++ touch driver remains GPLv3; its Python files use MIT.
+No credentials, private card libraries or precompiled firmware are included.

@@ -1,17 +1,17 @@
 {
-  "alias": "NFC Jukebox – Karte abspielen",
-  "description": "Kartenverwaltung im Dashboard NFC Karten. card_map ist die einzige aktive Zuordnung.",
+  "alias": "NFC Jukebox – Play card",
+  "description": "Manage cards in the NFC Cards dashboard. card_map is the only active mapping.",
   "mode": "parallel",
   "fields": {
     "tag_id": {
-      "name": "Kartenkennung",
+      "name": "Card ID",
       "required": true,
       "selector": {
         "text": {}
       }
     },
     "reader_id": {
-      "name": "Reader-ID",
+      "name": "Reader ID",
       "required": true,
       "selector": {
         "text": {}

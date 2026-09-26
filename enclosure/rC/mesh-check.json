@@ -1,5 +1,5 @@
 {
-  "gehaeuse.stl": {
+  "body.stl": {
     "watertight": true,
     "consistent_winding": true,
     "bodies": 1,
@@ -11,7 +11,7 @@
     "volume_mm3": 23856.17518821058,
     "downward_area_above_first_layer_mm2": 21.319999999999958
   },
-  "einschub.stl": {
+  "drawer.stl": {
     "watertight": true,
     "consistent_winding": true,
     "bodies": 1,
@@ -23,7 +23,7 @@
     "volume_mm3": 20666.46319002619,
     "downward_area_above_first_layer_mm2": 87.96000000000018
   },
-  "riegel.stl": {
+  "keys.stl": {
     "watertight": true,
     "consistent_winding": true,
     "bodies": 4,
@@ -35,7 +35,7 @@
     "volume_mm3": 498.21860799999996,
     "downward_area_above_first_layer_mm2": 0.0
   },
-  "riegel-lose.stl": {
+  "keys-loose.stl": {
     "watertight": true,
     "consistent_winding": true,
     "bodies": 4,
@@ -47,7 +47,7 @@
     "volume_mm3": 490.38837600000005,
     "downward_area_above_first_layer_mm2": 0.0
   },
-  "klemmleisten-normal.stl": {
+  "clamp-strips-normal.stl": {
     "watertight": true,
     "consistent_winding": true,
     "bodies": 2,
@@ -59,7 +59,7 @@
     "volume_mm3": 437.05109630452233,
     "downward_area_above_first_layer_mm2": 0.0
   },
-  "klemmleisten-eng.stl": {
+  "clamp-strips-tight.stl": {
     "watertight": true,
     "consistent_winding": true,
     "bodies": 2,
@@ -71,7 +71,7 @@
     "volume_mm3": 467.5448489345661,
     "downward_area_above_first_layer_mm2": 0.0
   },
-  "klemmleisten-lose.stl": {
+  "clamp-strips-loose.stl": {
     "watertight": true,
     "consistent_winding": true,
     "bodies": 2,

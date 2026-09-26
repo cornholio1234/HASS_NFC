@@ -1,5 +1,5 @@
 {
-  "alias": "NFC Jukebox – Reader-Anlernmodus",
+  "alias": "NFC Jukebox – Reader enrollment",
   "mode": "queued",
   "max": 30,
   "fields": {

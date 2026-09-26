@@ -1,5 +1,5 @@
 {
-  "alias": "NFC Jukebox – Reader-Konfiguration",
+  "alias": "NFC Jukebox – Reader configuration",
   "mode": "queued",
   "variables": {
     "profiles": {}

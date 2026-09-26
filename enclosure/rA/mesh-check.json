@@ -1,5 +1,5 @@
 {
-  "gehaeuse.stl": {
+  "body.stl": {
     "watertight": true,
     "winding_consistent": true,
     "bodies": 1,
@@ -17,7 +17,7 @@
     ],
     "volume_mm3": 20970.986870872206
   },
-  "einschub.stl": {
+  "drawer.stl": {
     "watertight": true,
     "winding_consistent": true,
     "bodies": 1,

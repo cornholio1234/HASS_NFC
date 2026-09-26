@@ -42,7 +42,7 @@ template:
 
         {{ ''NFC:'' ~ (dict(ns.items) | to_json) }}'
 automation:
-- alias: NFC Musikterminal - Spotify Playlist abspielen
+- alias: NFC jukebox - Play Spotify content
   id: nfc_spotify_playlist_player
   mode: parallel
   max: 20
@@ -57,7 +57,7 @@ automation:
     data:
       tag_id: '{{ trigger.event.data.tag_id | upper }}'
       reader_id: '{{ trigger.event.data.device_id }}'
-- alias: NFC Reader-Konfiguration laden
+- alias: NFC - Load reader configuration
   id: nfc_jukebox_config_start
   triggers:
   - trigger: homeassistant

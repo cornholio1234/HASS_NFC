@@ -9,6 +9,32 @@ esphome:
   name: ${device_name}
   friendly_name: ${friendly_name}
   min_version: 2026.9.0
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: wake_display
+      - lambda: |-
+          // Compare the acceleration vector with a slowly following baseline.
+          // Units are g; gravity/orientation alone must not keep the screen on.
+          id(panel_motion).add_listener([](auto &data) {
+            static bool initialized = false;
+            static float baseline[3] = {};
+            float delta_squared = 0;
+            for (int i = 0; i < 3; i++)
+              if (!std::isfinite(data.acceleration[i])) return;
+            for (int i = 0; i < 3; i++) {
+              const float value = data.acceleration[i];
+              if (!initialized) baseline[i] = value;
+              const float delta = value - baseline[i];
+              delta_squared += delta * delta;
+              baseline[i] += 0.15f * delta;
+            }
+            if (initialized && delta_squared > 0.18f * 0.18f) {
+              if (!id(lcd_backlight).state) ESP_LOGI("display_idle", "Wake: motion");
+              id(wake_display).execute();
+            }
+            initialized = true;
+          });
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -53,16 +79,16 @@ http_request:
   timeout: 10s
   verify_ssl: false
 
-# Waveshare ESP32-S3-Touch-LCD-2: CST816D, I2C-Adresse 0x15.
+# Waveshare ESP32-S3-Touch-LCD-2: CST816D, I2C address 0x15.
 i2c:
   id: touch_i2c
   sda: GPIO48
   scl: GPIO47
   frequency: 400kHz
 
-# LCD und RC522 verwenden getrennte SPI-Busse. Die RC522-Signale auf
-# GPIO11-15 liegen zugleich am unbenutzten Kameraanschluss; deshalb darf keine
-# Kamera angeschlossen sein. Alle sieben RC522-Leitungen bleiben damit auf P2.
+# LCD and RC522 use separate SPI buses. RC522 signals on
+# GPIO11-15 also reach the unused camera connector. Do not connect a
+# camera at the same time. All seven RC522 wires stay on header P2.
 spi:
   - id: lcd_spi
     clk_pin: GPIO39
@@ -85,9 +111,58 @@ rc522_spi:
       - lambda: |-
           id(last_tag).publish_state(x);
           id(last_scan_ms) = millis();
+          id(wake_display).execute();
       - homeassistant.tag_scanned: !lambda return x;
 
+# Backlight sleep only: Wi-Fi, NFC, touch and playback remain available.
+script:
+  - id: wake_display
+    mode: restart
+    then:
+      - lambda: |-
+          id(display_activity_ms) = millis();
+          if (!id(lcd_backlight).state) {
+            id(display_wake_ms) = millis();
+            id(lcd_backlight).turn_on();
+          }
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(lcd_backlight).state && !id(display_touch_active) &&
+              uint32_t(millis() - id(display_activity_ms)) >= 60000UL) {
+            id(lcd_backlight).turn_off();
+            ESP_LOGI("display_idle", "Backlight off after 60s inactivity");
+          }
+
+motion:
+  - platform: qmi8658
+    id: panel_motion
+    i2c_id: touch_i2c
+    address: 0x6B
+    accelerometer_range: 4G
+    accelerometer_odr: 125HZ
+    gyroscope_odr: 125HZ
+    update_interval: 50ms
+
 globals:
+  - id: display_activity_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  - id: display_wake_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  - id: display_touch_active
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: wake_touch_only
+    type: bool
+    restore_value: false
+    initial_value: "false"
   - id: seek_target_seconds
     type: float
     restore_value: false
@@ -218,7 +293,7 @@ text_sensor:
 
   - platform: template
     id: last_tag
-    name: "Letzte Karten-UID"
+    name: "Last card UID"
     icon: mdi:card-account-details-outline
     update_interval: never
 
@@ -266,7 +341,7 @@ text_sensor:
 binary_sensor:
   - platform: status
     id: api_status
-    name: "Verbindung"
+    name: "Connection"
 
   - platform: touchscreen
     id: touch_restart
@@ -279,7 +354,7 @@ binary_sensor:
     on_press:
       - if:
           condition:
-            lambda: return id(api_status).state && id(progress_player_source).state == "matched";
+            lambda: return !id(wake_touch_only) && id(lcd_backlight).state && id(api_status).state && id(progress_player_source).state == "matched";
           then:
           - lambda: |-
               id(pending_button) = 1;
@@ -304,7 +379,7 @@ binary_sensor:
     on_press:
       - if:
           condition:
-            lambda: return id(api_status).state && id(progress_player_source).state == "matched";
+            lambda: return !id(wake_touch_only) && id(lcd_backlight).state && id(api_status).state && id(progress_player_source).state == "matched";
           then:
           - lambda: |-
               id(pending_button) = 2;
@@ -329,7 +404,7 @@ binary_sensor:
     on_press:
       - if:
           condition:
-            lambda: return id(api_status).state && id(progress_player_source).state == "matched";
+            lambda: return !id(wake_touch_only) && id(lcd_backlight).state && id(api_status).state && id(progress_player_source).state == "matched";
           then:
           - lambda: |-
               id(pending_button) = 3;
@@ -419,7 +494,7 @@ image:
     on_error:
       - lambda: id(cover_ready) = false;
       - component.update: lcd
-      - logger.log: "Albumcover konnte nicht geladen werden"
+      - logger.log: "Could not load album cover"
 
 display:
   - platform: mipi_spi
@@ -514,7 +589,7 @@ display:
         if (progress_width > 0)
           it.filled_rectangle(12, 29, progress_width, 6, id(accent));
       }
-      // Echtes Cover; der kleine Tonträger bleibt als Fallback sichtbar.
+      // Actual cover image; the small record icon remains visible as a fallback.
       fill_rounded(12, 50, 108, 112, 12, id(surface));
       it.filled_circle(66, 106, 28, id(surface_alt));
       it.filled_circle(66, 106, 9,
@@ -523,29 +598,29 @@ display:
       if (id(cover_ready)) it.image(14, 54, id(media_cover));
 
       if (!connected) {
-        it.print(132, 57, id(font_label), id(warning_text), "VERBINDUNG");
+        it.print(132, 57, id(font_label), id(warning_text), "CONNECTION");
         it.print(132, 79, id(font_medium), id(primary_text), "Home Assistant");
-        it.print(132, 108, id(font_medium), id(primary_text), "nicht verbunden");
+        it.print(132, 108, id(font_medium), id(primary_text), "disconnected");
         it.print(132, 141, id(font_small), id(secondary_text),
-                 "WLAN / ESPHome prüfen");
+                 "Check Wi-Fi / ESPHome");
       } else if (command_pending || feedback_timeout) {
-        const char *action = id(pending_button) == 1 ? "ZURÜCK" :
+        const char *action = id(pending_button) == 1 ? "PREVIOUS" :
                              id(pending_button) == 2 ? "PLAY / PAUSE" :
-                             id(pending_button) == 4 ? "POSITION" : "WEITER";
+                             id(pending_button) == 4 ? "POSITION" : "NEXT";
         it.print(132, 57, id(font_label), id(accent),
-                 command_pending ? action : "KEINE RÜCKMELDUNG");
+                 command_pending ? action : "NO RESPONSE");
         it.print(132, 84, id(font_medium), id(primary_text),
-                 command_pending ? "Wird geladen ..." : "Bitte erneut");
+                 command_pending ? "Loading ..." : "Please try");
         it.print(132, 119, id(font_small), id(secondary_text),
-                 command_pending ? "Eingabe erkannt" : "versuchen");
+                 command_pending ? "Input received" : "again");
         if (command_pending) {
           it.filled_rectangle(132, 145, 176, 4, id(surface_alt));
           const int offset = ((millis() - id(pending_since)) / 12) % 145;
           it.filled_rectangle(132 + offset, 145, 32, 4, id(accent));
         }
       } else if (card_seen) {
-        it.print(132, 57, id(font_label), id(accent), "NFC-KARTE ERKANNT");
-        it.print(132, 81, id(font_large), id(primary_text), "Wird geladen");
+        it.print(132, 57, id(font_label), id(accent), "NFC CARD DETECTED");
+        it.print(132, 81, id(font_large), id(primary_text), "Loading");
         it.print(132, 119, id(font_small), id(secondary_text),
                  id(last_tag).state.c_str());
         it.filled_rectangle(132, 145, 116, 5, id(surface_alt));
@@ -557,17 +632,17 @@ display:
         };
         const bool has_title = has_metadata(id(media_title).state);
         const std::string title = has_title ? id(media_title).state :
-            (media_active ? "Wird geladen ..." : "Karte auflegen");
+            (media_active ? "Loading ..." : "Scan a card");
         const std::string artist = has_metadata(id(media_artist).state)
             ? id(media_artist).state :
-              (media_active || has_title ? "" : "Playlist auswählen");
-        const char *label = media_active && !has_title ? "WIRD GELADEN" :
-                            playing ? "JETZT LÄUFT" :
-                            (paused ? "PAUSIERT" : "BEREIT");
+              (media_active || has_title ? "" : "Choose a playlist");
+        const char *label = media_active && !has_title ? "LOADING" :
+                            playing ? "NOW PLAYING" :
+                            (paused ? "PAUSED" : "READY");
         it.print(132, 57, id(font_label),
                  playing ? id(accent) : id(secondary_text), label);
 
-        // Lange Titel laufen nahtlos durch den verfügbaren Bereich.
+        // Scroll long titles continuously through the available area.
         const int text_left = 132;
         const int text_right = width - 12;
         const int viewport_width = text_right - text_left;
@@ -597,7 +672,7 @@ display:
         it.end_clipping();
       }
 
-      // Drei reine Icon-Tasten: vorheriger Titel, Play/Pause, nächster Titel.
+      // Three icon buttons: previous track, play/pause, next track.
       fill_rounded(12, 176, 90, 55, 14,
           id(touch_restart).state ? id(surface_alt) : id(button_fill));
       it.filled_rectangle(36, 191, 4, 24, id(primary_text));
@@ -636,14 +711,29 @@ touchscreen:
       swap_xy: true
       mirror_x: false
       mirror_y: true
+    on_update:
+      - lambda: |-
+          if (!touches.empty()) id(display_activity_ms) = millis();
+    on_release:
+      - lambda: |-
+          id(display_touch_active) = false;
+          id(wake_touch_only) = false;
+          id(display_activity_ms) = millis();
     on_touch:
       - lambda: |-
+          // on_touch runs before the three touchscreen button listeners.
+          // Suppress this entire gesture if it wakes the screen, including seek.
+          id(wake_touch_only) = !id(lcd_backlight).state ||
+              uint32_t(millis() - id(display_wake_ms)) < 500UL;
+          id(display_touch_active) = true;
+          if (!id(lcd_backlight).state) ESP_LOGI("display_idle", "Wake: touch");
+          id(wake_display).execute();
           ESP_LOGI("touch", "x=%d y=%d raw_x=%d raw_y=%d",
                    touch.x, touch.y, touch.x_raw, touch.y_raw);
       - if:
           condition:
             lambda: |-
-              return touch.y <= 43 && touch.x >= 12 && touch.x <= 307 &&
+              return !id(wake_touch_only) && touch.y <= 43 && touch.x >= 12 && touch.x <= 307 &&
                      id(api_status).state &&
                      id(progress_player_source).state == "matched" &&
                      (id(progress_player_state).state == "playing" ||

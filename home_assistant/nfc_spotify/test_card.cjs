@@ -43,8 +43,8 @@ console.log('PASS: scans and enrollment leases are isolated by selected reader.'
   assert.equal(writes,1);assert.equal(stored.variables.card_map['AA-BB-CC-01'].kind,'audiobook');
   console.log('PASS: saved type update preserves mapping and script; concurrent edits block writes.');
   delete stored.concurrentChange;
-  await ctx.test.NfcCardEnroller.prototype.saveKind.call(editor,'AA-BB-CC-01','  Neuer Titel  ','name');
-  assert.equal(stored.variables.card_map['AA-BB-CC-01'].name,'Neuer Titel');
+  await ctx.test.NfcCardEnroller.prototype.saveKind.call(editor,'AA-BB-CC-01','  New title  ','name');
+  assert.equal(stored.variables.card_map['AA-BB-CC-01'].name,'New title');
   assert.equal(stored.variables.card_map['AA-BB-CC-01'].kind,'audiobook');
   assert.equal(stored.variables.card_map['AA-BB-CC-01'].uri,map['AA-BB-CC-01'].uri);
   const renameWrites=writes;
@@ -61,17 +61,35 @@ console.log('PASS: scans and enrollment leases are isolated by selected reader.'
   await ctx.test.NfcCardEnroller.prototype.deleteCard.call(editor,'AA-BB-CC-01');assert.equal(writes,oldWrites);
   const many=Object.fromEntries(Array.from({length:80},(_,i)=>[`AA-BB-${i}`,{name:`Elena ${80-i}`,kind:i%2?'music':'audiobook'}]));
   assert.equal(ctx.test.visibleCards(many,'','title')[0][1].name,'Elena 1');
-  assert.equal(ctx.test.visibleCards(many,'HÖRBUCH').length,40);
+  assert.equal(ctx.test.visibleCards(many,'AUDIOBOOK').length,40);
   assert.equal(ctx.test.visibleCards(many,'AA-BB-79').length,1);
   assert.equal(ctx.test.visibleCards(many,'no match').length,0);
   console.log('PASS: delete/undo restores full mapping; learning blocks deletion; 80-card search and numeric title sort.');
-  const auto=parseBatch('https://open.spotify.com/intl-de/album/4Vo30C4a0cpVbTtVHZKYIg\nMein Name | spotify:playlist:37i9dQZF1E4weo7Nn3vlcB');
+  const auto=parseBatch('https://open.spotify.com/intl-de/album/4Vo30C4a0cpVbTtVHZKYIg\nMy title | spotify:playlist:37i9dQZF1E4weo7Nn3vlcB');
   let calls=0;
-  await ctx.test.resolveNames(auto,async uri=>{calls++;assert.equal(uri,'spotify:album:4Vo30C4a0cpVbTtVHZKYIg');return 'Album aus Spotify';});
-  assert.equal(auto[0].name,'Album aus Spotify');assert.equal(auto[1].name,'Mein Name');assert.equal(calls,1);
+  await ctx.test.resolveNames(auto,async uri=>{calls++;assert.equal(uri,'spotify:album:4Vo30C4a0cpVbTtVHZKYIg');return 'Album from Spotify';});
+  assert.equal(auto[0].name,'Album from Spotify');assert.equal(auto[1].name,'My title');assert.equal(calls,1);
   const failed=parseBatch('spotify:album:4Vo30C4a0cpVbTtVHZKYIg');
   await ctx.test.resolveNames(failed,async()=>{throw Error('offline');});
   assert.equal(failed[0].name,'');assert.ok(failed[0].nameError);
-  await ctx.test.resolveNames(failed,async()=>'Erneut geladen');assert.equal(failed[0].name,'Erneut geladen');assert.ok(!failed[0].nameError);
+  await ctx.test.resolveNames(failed,async()=>'Loaded on retry');assert.equal(failed[0].name,'Loaded on retry');assert.ok(!failed[0].nameError);
   console.log('PASS: automatic title, manual override, failure visibility, retry.');
+  for(const [status,uid] of [['connection','last_card_uid'],['verbindung','letzte_karten_uid']]){
+    let profiles={variables:{profiles:{}}};
+    const fields={'profile-device':'reader-1','profile-player':'media_player.spotify_test',
+      'profile-source':'Office','profile-name':'Desk','profile-kind':'audiobook','profile-shuffle':'keep'};
+    const pairing={busy:false,active:false,profiles:{},profileBase:structuredClone(profiles),
+      shadowRoot:{querySelector:id=>({value:fields[id.slice(1)]})},
+      entities:[{device_id:'reader-1',entity_id:`binary_sensor.panel_${status}`},
+                {device_id:'reader-1',entity_id:`sensor.panel_${uid}`}],
+      leaseFor:()=>0,render(){},buildProfiles(){},loadProfile(){},
+      _hass:{states:{'media_player.spotify_test':{attributes:{source_list:['Office']}}},
+        callApi:async(method,path,data)=>{if(method==='POST')profiles=structuredClone(data);return structuredClone(profiles);},
+        callService:async()=>{}}};
+    await ctx.test.NfcCardEnroller.prototype.saveProfile.call(pairing);
+    assert.equal(profiles.variables.profiles['reader-1'].status_entity,`binary_sensor.panel_${status}`);
+    assert.equal(profiles.variables.profiles['reader-1'].last_uid_entity,`sensor.panel_${uid}`);
+    assert.equal(profiles.variables.profiles['reader-1'].default_kind,'audiobook');
+  }
+  console.log('PASS: reader pairing detects English and legacy sensor entity names.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

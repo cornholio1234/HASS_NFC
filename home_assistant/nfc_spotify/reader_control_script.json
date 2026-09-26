@@ -1,5 +1,5 @@
 {
-  "alias": "NFC Jukebox – Reader-Tasten",
+  "alias": "NFC Jukebox – Reader controls",
   "mode": "parallel",
   "max": 20,
   "fields": {

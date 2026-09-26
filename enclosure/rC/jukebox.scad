@@ -160,5 +160,3 @@ else if(part=="exploded"){
   color([0.3,0.36,0.42])drawer();hardware();
   color([0.95,0.7,0.1])strips();color([0.1,0.65,0.7])keys();
 }
-
-

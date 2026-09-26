@@ -1,72 +1,82 @@
-# Architektur
+# Architecture
 
-## Datenfluss
+## Data flow
 
 ```mermaid
 flowchart LR
-  R[NFC-Reader: tag_scanned] --> A[HA-Automation]
-  A --> P[Reader-Profil: Konto und Lautsprecher]
-  P --> C[Gemeinsame Kartenbibliothek: UID, URI, Titel, Typ]
-  C --> S[Native Spotify-Integration]
-  S --> L[Spotify-Connect-Lautsprecher]
-  P --> T[HA-Template: Metadaten je Reader]
+  R[NFC reader: tag_scanned] --> A[HA automation]
+  A --> P[Reader profile: account and speaker]
+  P --> C[Shared card library: UID, URI, title, type]
+  C --> S[Native Spotify integration]
+  S --> L[Spotify Connect speaker]
+  P --> T[HA template: metadata per reader]
   S --> T
-  T --> D[ESP32-Display]
-  D --> B[Reader-bezogene Tastenbefehle]
+  T --> D[ESP32 display]
+  D --> B[Reader-specific button commands]
   B --> S
 ```
 
-## Dateien und aktive Daten
+## Files and active data
 
-| Bestandteil | Ort in Home Assistant |
+| Component | Location in Home Assistant |
 |---|---|
-| Karten | `script.nfc_jukebox_play_card`, `variables.card_map` |
-| Reader-Profile | `script.nfc_jukebox_reader_config`, `variables.profiles` |
-| Scan-Weiterleitung, Startautomatik, Template-Sensoren | `/config/packages/nfc_spotify.yaml` |
-| Oberfläche | `/config/www/nfc/nfc-card-enroller.js` |
-| Dashboard | HA Lovelace Storage, URL `/nfc-karten/anlernen` |
-| Entwürfe | Browser-localStorage, nach Reader getrennt |
-| Löschhistorie / letzte Sicherung | Browser-localStorage |
+| Cards | `script.nfc_jukebox_play_card`, `variables.card_map` |
+| Reader profiles | `script.nfc_jukebox_reader_config`, `variables.profiles` |
+| Scan routing, startup automation, template sensors | `/config/packages/nfc_spotify.yaml` |
+| Dashboard UI | `/config/www/nfc/nfc-card-enroller.js` |
+| Dashboard | HA Lovelace storage, URL `/nfc-cards/enroll` |
+| Drafts | Browser localStorage, separated by reader |
+| Deletion history / latest backup | Browser localStorage |
 
-Die JSON-Dateien im Repository sind **leere Installationsvorlagen**, keine
-Synchronisation der produktiven Daten. Nach Einrichtung bleiben Konten und
-Karten ausschließlich in der jeweiligen Home-Assistant-Installation.
+Repository JSON files are **empty installation templates**, not synchronized
+production data. Accounts and cards remain inside the user's Home Assistant
+installation after setup. Existing technical entity IDs, event names, storage keys
+are retained for compatibility; new dashboards use an English route. The installer
+also recognizes and preserves the original dashboard route. Visible labels are English.
 
-Der Konfigurationsskript-Aufruf veröffentlicht ein Event. Der Trigger-Template-
-Sensor `sensor.nfc_jukebox_profiles` hält die Profile zur Laufzeit und stellt sie
-nach Neustarts wieder her; zusätzlich veröffentlicht die Startautomation die
-persistierte Skriptkonfiguration neu. Profiländerungen werden gespeichert,
-zurückgelesen und anschließend veröffentlicht.
+Calling the configuration script publishes an event. The trigger-based template
+sensor `sensor.nfc_jukebox_profiles` holds profiles at runtime and restores them
+after restart. The startup automation also republishes the persisted script
+configuration. Profile updates are saved, read back and then published.
 
-`sensor.nfc_jukebox_runtime` erzeugt ein `NFC:`-präfigiertes JSON-Attribut für alle
-Reader. Jedes Display wählt daraus nur seine feste Hardware-Reader-ID. Bei einer
-anderen aktiven Quelle des Spotify-Players zeigt das Panel keinen fremden Titel
-und seine Tasten steuern diesen Player nicht. Cover-Downloads verwenden weiterhin
-die HA-Proxy-Adresse beziehungsweise die von HA gelieferte Bild-URL.
+`sensor.nfc_jukebox_runtime` generates a JSON attribute prefixed with `NFC:` for all
+readers. Each display selects its fixed hardware reader ID. When a Spotify player
+has a different active source, the panel does not show that source's track or
+control its playback. Cover downloads use Home Assistant's proxy address or the
+image URL provided by Home Assistant.
 
-Die Wiedergabe wird parallel ausgeführt; verschiedene Reader brechen einander
-nicht ab. Ein Spotify-Konto bleibt allerdings eine gemeinsame Wiedergabesitzung:
-Zwei Profile mit demselben Konto ergeben keine zwei unabhängigen Streams.
+Playback scripts run in parallel so different readers do not cancel one another.
+A Spotify account still represents one shared playback session: two profiles using
+the same account do not provide two independent streams.
 
-## Schutz vor Fehlzuordnung
+## Mapping safeguards
 
-- Unbekannte Reader/UIDs oder ungültige Spotify-URIs starten keine Wiedergabe.
-- Anlern-/Prüfsperren liegen in `sensor.nfc_jukebox_sessions`, nach Reader getrennt.
-  Sie werden für maximal 90 Sekunden gesetzt und regelmäßig erneuert.
-- Tasten akzeptieren nur vorheriger Titel, Play/Pause, nächster Titel und Seek.
-- Änderungen an Karten und Profilen erhalten fremde Konfigurationseinträge.
-  Eine erneute Prüfung vor dem Schreiben erkennt zwischenzeitliche Änderungen;
-  eine vollständig atomare Compare-and-swap-Operation bietet die HA-API nicht.
-- Namen werden als Text ausgegeben und dürfen keine Jinja-Klammern enthalten.
-- Öffentliche Spotify-oEmbed-Anfragen benötigen keine Spotify-Zugangsdaten.
+- Unknown readers/UIDs and invalid Spotify URIs do not start playback.
+- Enrollment/inspection leases are stored per reader in `sensor.nfc_jukebox_sessions`.
+  They last at most 90 seconds and are renewed while the page is active.
+- Controls accept only previous track, play/pause, next track and seek.
+- Card/profile changes preserve unrelated configuration entries. A read before
+  writing detects intervening changes, but the Home Assistant API does not provide
+  a fully atomic compare-and-swap operation.
+- Titles are rendered as text and cannot contain Jinja braces.
+- Public Spotify oEmbed requests do not require Spotify credentials.
 
-## Firmware und Gehäuse
+## Firmware and enclosure
 
-Die Firmware enthält die GPIO-/Display-Konfiguration und eine Reader-ID, aber
-keine fest verdrahtete Spotify-Konto- oder Lautsprecher-Zuordnung. Der lokale
-CST816-Patch ist unter [esphome/components/cst816](../esphome/components/cst816/README.md)
-dokumentiert. Verbindungsdaten gehören in ESPHome secrets.
+Firmware holds GPIO/display settings and a reader ID, without hard-coded account
+or speaker mappings. The local [CST816 patch](../esphome/components/cst816/README.md)
+is documented separately. Connection credentials belong in ESPHome secrets.
 
-`enclosure/r0`, `rA`, `rB` enthalten OpenSCAD-Quellen, STL und geometrische Prüfungen.
-Die mechanischen Probleme von rB stehen ausdrücklich in der Haupt-README.
-Ein rC-Entwurf ist nicht Bestandteil dieses Releases.
+The backlight turns off after 60 seconds without touch, detected movement or a new
+card scan. Playback and network/NFC/touch processing continue. The QMI8658 is sampled
+at 50 ms intervals; a 0.18 g vector deviation from a moving baseline counts as
+movement. Initial samples and non-finite values do not trigger wake. Touch wakes
+before button listeners run; the whole wake gesture is blocked from playback
+commands, including seeking. A 500 ms guard also covers a touch immediately after
+motion wake. Metadata and track changes do not refresh the activity timer. This
+addition has compiled successfully but still needs physical testing.
+
+`enclosure/r0`, `rA`, `rB` and `rC` include OpenSCAD sources, STL files and geometric
+checks. rB's physical test exposed weak supports and catches. rC introduces broad
+supports, replaceable display clamp strips and four removable locking keys; it is
+geometrically checked but has not been printed or mechanically tested.
