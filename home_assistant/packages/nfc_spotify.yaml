@@ -1,0 +1,66 @@
+template:
+- triggers:
+  - trigger: event
+    event_type: nfc_jukebox_profiles_updated
+  sensor:
+  - name: NFC Jukebox Profiles
+    unique_id: nfc_jukebox_profiles
+    state: '{{ now().isoformat() }}'
+    attributes:
+      profiles: '{{ trigger.event.data.profiles }}'
+- triggers:
+  - trigger: event
+    event_type: nfc_jukebox_session
+  sensor:
+  - name: NFC Jukebox Sessions
+    unique_id: nfc_jukebox_sessions
+    state: '{{ now().isoformat() }}'
+    attributes:
+      leases: '{{ dict((this.attributes.get(''leases'', {}) or {}), **{trigger.event.data.reader_id: trigger.event.data.until}) }}'
+- sensor:
+  - name: NFC Jukebox Runtime
+    unique_id: nfc_jukebox_runtime
+    state: ready
+    attributes:
+      readers_json: '{% set ns = namespace(items=[]) %}
+
+        {% for rid, p in (state_attr(''sensor.nfc_jukebox_profiles'', ''profiles'') or {}).items() %}
+
+        {% set player = p.get(''player'', '''') %}
+
+        {% set match = state_attr(player, ''source'') == p.get(''source'') %}
+
+        {% set data = dict(state=states(player) if match else ''idle'', matched=match, target=p.get(''source'', ''''), media_position=state_attr(player, ''media_position'')
+        if match else none, media_duration=state_attr(player, ''media_duration'') if match else none, media_position_updated_at=state_attr(player, ''media_position_updated_at'')
+        | string if match else none, media_title=state_attr(player, ''media_title'') if match else none, media_content_id=state_attr(player, ''media_content_id'')
+        if match else none, media_artist=state_attr(player, ''media_artist'') if match else none, entity_picture=state_attr(player, ''entity_picture'') if match else
+        none, source=state_attr(player, ''source'') if match else none) %}
+
+        {% set ns.items = ns.items + [(rid, data)] %}
+
+        {% endfor %}
+
+        {{ ''NFC:'' ~ (dict(ns.items) | to_json) }}'
+automation:
+- alias: NFC Musikterminal - Spotify Playlist abspielen
+  id: nfc_spotify_playlist_player
+  mode: parallel
+  max: 20
+  triggers:
+  - trigger: event
+    event_type: tag_scanned
+  conditions:
+  - condition: template
+    value_template: '{{ trigger.event.data.get(''device_id'', '''') in (state_attr(''sensor.nfc_jukebox_profiles'', ''profiles'') or {}) }}'
+  actions:
+  - action: script.nfc_jukebox_play_card
+    data:
+      tag_id: '{{ trigger.event.data.tag_id | upper }}'
+      reader_id: '{{ trigger.event.data.device_id }}'
+- alias: NFC Reader-Konfiguration laden
+  id: nfc_jukebox_config_start
+  triggers:
+  - trigger: homeassistant
+    event: start
+  actions:
+  - action: script.nfc_jukebox_reader_config

@@ -1,0 +1,38 @@
+{
+  "gehaeuse.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "bodies": 1,
+    "bounds_mm": [
+      [
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        70.0,
+        50.0,
+        60.0
+      ]
+    ],
+    "volume_mm3": 20970.986870872206
+  },
+  "einschub.stl": {
+    "watertight": true,
+    "winding_consistent": true,
+    "bodies": 1,
+    "bounds_mm": [
+      [
+        1.54999,
+        2.3,
+        -3.8147e-07
+      ],
+      [
+        68.45,
+        50.0,
+        57.6
+      ]
+    ],
+    "volume_mm3": 13396.967483479799
+  }
+}

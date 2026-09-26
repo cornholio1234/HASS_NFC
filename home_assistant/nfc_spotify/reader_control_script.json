@@ -1,0 +1,56 @@
+{
+  "alias": "NFC Jukebox – Reader-Tasten",
+  "mode": "parallel",
+  "max": 20,
+  "fields": {
+    "reader_id": {
+      "required": true
+    },
+    "command": {
+      "required": true
+    }
+  },
+  "variables": {
+    "profile": "{{ (state_attr('sensor.nfc_jukebox_profiles', 'profiles') or {}).get(reader_id | default(''), {}) }}",
+    "player": "{{ profile.get('player', '') }}",
+    "allowed": {
+      "previous": "media_player.media_previous_track",
+      "toggle": "media_player.media_play_pause",
+      "next": "media_player.media_next_track",
+      "seek": "media_player.media_seek"
+    }
+  },
+  "sequence": [
+    {
+      "condition": "template",
+      "value_template": "{{ profile and command in allowed and state_attr(player, 'source') == profile.get('source') }}"
+    },
+    {
+      "if": [
+        {
+          "condition": "template",
+          "value_template": "{{ command == 'seek' }}"
+        }
+      ],
+      "then": [
+        {
+          "action": "media_player.media_seek",
+          "target": {
+            "entity_id": "{{ player }}"
+          },
+          "data": {
+            "seek_position": "{{ [[seek_position | default(0) | float(0), 0] | max, state_attr(player, 'media_duration') | float(0)] | min }}"
+          }
+        }
+      ],
+      "else": [
+        {
+          "action": "{{ allowed[command] }}",
+          "target": {
+            "entity_id": "{{ player }}"
+          }
+        }
+      ]
+    }
+  ]
+}

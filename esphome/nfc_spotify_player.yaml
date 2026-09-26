@@ -1,0 +1,673 @@
+substitutions:
+  device_name: nfc-jukebox
+  friendly_name: NFC Spotify Player
+  # Stable hardware identity; player and speaker are configured in HA.
+  reader_id: REPLACE_WITH_HOME_ASSISTANT_DEVICE_ID
+  home_assistant_url: http://homeassistant.local:8123
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.9.0
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
+# ESPHome 2026.9.0 CST816 with raw-coordinate validation before touch dispatch.
+external_components:
+  - source:
+      type: local
+      path: components
+    components: [cst816]
+
+json:
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Setup"
+
+captive_portal:
+
+http_request:
+  timeout: 10s
+  verify_ssl: false
+
+# Waveshare ESP32-S3-Touch-LCD-2: CST816D, I2C-Adresse 0x15.
+i2c:
+  id: touch_i2c
+  sda: GPIO48
+  scl: GPIO47
+  frequency: 400kHz
+
+# LCD und RC522 verwenden getrennte SPI-Busse. Die RC522-Signale auf
+# GPIO11-15 liegen zugleich am unbenutzten Kameraanschluss; deshalb darf keine
+# Kamera angeschlossen sein. Alle sieben RC522-Leitungen bleiben damit auf P2.
+spi:
+  - id: lcd_spi
+    clk_pin: GPIO39
+    mosi_pin: GPIO38
+  - id: rfid_spi
+    clk_pin: GPIO14
+    mosi_pin: GPIO13
+    miso_pin: GPIO12
+
+rc522_spi:
+  id: rfid_reader
+  # 1 MHz verified with wired reader; 4 MHz did not yield a UID.
+  data_rate: 1MHz
+  spi_id: rfid_spi
+  cs_pin: GPIO11
+  reset_pin: GPIO15
+  update_interval: 1s
+  on_tag:
+    then:
+      - lambda: |-
+          id(last_tag).publish_state(x);
+          id(last_scan_ms) = millis();
+      - homeassistant.tag_scanned: !lambda return x;
+
+globals:
+  - id: seek_target_seconds
+    type: float
+    restore_value: false
+    initial_value: "0"
+  - id: last_seek_touch_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  - id: cover_ready
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: last_media_active_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  - id: last_scan_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+
+  - id: pending_button
+    type: int
+    restore_value: false
+    initial_value: "0"
+  - id: pending_since
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  - id: pending_value
+    type: std::string
+    restore_value: false
+    initial_value: '""'
+  - id: feedback_timeout_since
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+
+  - id: position_epoch
+    type: int64_t
+    restore_value: false
+    initial_value: "0"
+
+time:
+  - platform: homeassistant
+    id: ha_clock
+
+sensor:
+  - platform: template
+    id: track_position
+    update_interval: never
+    internal: true
+    on_value:
+      - lambda: |-
+          if (id(pending_button) == 4 && std::isfinite(x) &&
+              fabsf(x - id(seek_target_seconds)) < 3.0f)
+            id(pending_button) = 0;
+  - platform: template
+    id: track_duration
+    update_interval: never
+    internal: true
+
+text_sensor:
+  - platform: homeassistant
+    id: reader_runtime
+    entity_id: sensor.nfc_jukebox_runtime
+    attribute: readers_json
+    internal: true
+    on_value:
+      - lambda: |-
+          if (x.rfind("NFC:", 0) != 0) return;
+          json::parse_json(x.substr(4), [](JsonObject root) -> bool {
+            JsonObject data = root["${reader_id}"].as<JsonObject>();
+            const bool matched = !data.isNull() && (data["matched"] | false);
+            auto publish_text = [](text_sensor::TextSensor *sensor, const std::string &value) {
+              if (!sensor->has_state() || sensor->state != value) sensor->publish_state(value);
+            };
+            // Identity/state first, then position and cover, preserving the existing callbacks.
+            publish_text(id(progress_player_source), matched ? "matched" : "");
+            publish_text(id(progress_player_state), matched ? (data["state"] | "idle") : "idle");
+            publish_text(id(player_state), matched ? (data["state"] | "idle") : "idle");
+            publish_text(id(media_identity), matched ? (data["media_content_id"] | "") : "");
+            publish_text(id(media_title), matched ? (data["media_title"] | "") : "");
+            publish_text(id(media_artist), matched ? (data["media_artist"] | "") : "");
+            const float duration = matched ? (data["media_duration"] | 0.0f) : 0.0f;
+            const float position = matched ? (data["media_position"] | 0.0f) : 0.0f;
+            if (!id(track_duration).has_state() || id(track_duration).state != duration) id(track_duration).publish_state(duration);
+            if (!id(track_position).has_state() || id(track_position).state != position) id(track_position).publish_state(position);
+            publish_text(id(position_updated_at), matched ? (data["media_position_updated_at"] | "") : "");
+            publish_text(id(media_cover_url), matched ? (data["entity_picture"] | "") : "");
+            return true;
+          });
+
+  - platform: template
+    id: progress_player_state
+    update_interval: never
+    internal: true
+  - platform: template
+    id: progress_player_source
+    update_interval: never
+    internal: true
+  - platform: template
+    id: position_updated_at
+    update_interval: never
+    internal: true
+    on_value:
+      - lambda: |-
+          int year, month, day, hour, minute, second;
+          id(position_epoch) = 0;
+          if (sscanf(x.c_str(), "%d-%d-%d%*c%d:%d:%d",
+                     &year, &month, &day, &hour, &minute, &second) != 6) return;
+          ESPTime parsed = {};
+          parsed.year = year;
+          parsed.month = month;
+          parsed.day_of_month = day;
+          parsed.hour = hour;
+          parsed.minute = minute;
+          parsed.second = second;
+          int offset = 0;
+          const auto zone = x.find_first_of("+-", 19);
+          if (zone != std::string::npos) {
+            int zh = 0, zm = 0;
+            if (sscanf(x.c_str() + zone + 1, "%d:%d", &zh, &zm) == 2)
+              offset = (zh * 3600 + zm * 60) * (x[zone] == '-' ? -1 : 1);
+          }
+          parsed.recalc_timestamp_utc(false);
+          id(position_epoch) = static_cast<int64_t>(parsed.timestamp) - offset;
+
+  - platform: template
+    id: last_tag
+    name: "Letzte Karten-UID"
+    icon: mdi:card-account-details-outline
+    update_interval: never
+
+  - platform: template
+    id: player_state
+    update_interval: never
+    internal: true
+
+  - platform: template
+    id: media_title
+    update_interval: never
+    internal: true
+
+  - platform: template
+    id: media_identity
+    update_interval: never
+    internal: true
+
+  - platform: template
+    id: media_artist
+    update_interval: never
+    internal: true
+
+  - platform: template
+    id: media_cover_url
+    update_interval: never
+    internal: true
+    on_value:
+      then:
+        - lambda: id(cover_ready) = false;
+        - component.update: lcd
+        - if:
+            condition:
+              lambda: |-
+                return x.rfind("http://", 0) == 0 ||
+                       x.rfind("https://", 0) == 0 ||
+                       x.rfind("/api/media_player_proxy/", 0) == 0;
+            then:
+              - online_image.set_url:
+                  id: media_cover
+                  url: !lambda |-
+                    return x.rfind("/api/media_player_proxy/", 0) == 0
+                        ? std::string("${home_assistant_url}") + x : x;
+
+binary_sensor:
+  - platform: status
+    id: api_status
+    name: "Verbindung"
+
+  - platform: touchscreen
+    id: touch_restart
+    touchscreen_id: touch_panel
+    x_min: 0
+    x_max: 106
+    y_min: 165
+    y_max: 239
+    internal: true
+    on_press:
+      - if:
+          condition:
+            lambda: return id(api_status).state && id(progress_player_source).state == "matched";
+          then:
+          - lambda: |-
+              id(pending_button) = 1;
+              id(pending_since) = millis();
+              id(feedback_timeout_since) = 0;
+              id(pending_value) = id(media_identity).state + "|" + id(media_title).state;
+          - component.update: lcd
+          - homeassistant.action:
+              action: script.nfc_jukebox_control
+              data:
+                reader_id: ${reader_id}
+                command: previous
+
+  - platform: touchscreen
+    id: touch_play_pause
+    touchscreen_id: touch_panel
+    x_min: 107
+    x_max: 213
+    y_min: 165
+    y_max: 239
+    internal: true
+    on_press:
+      - if:
+          condition:
+            lambda: return id(api_status).state && id(progress_player_source).state == "matched";
+          then:
+          - lambda: |-
+              id(pending_button) = 2;
+              id(pending_since) = millis();
+              id(feedback_timeout_since) = 0;
+              id(pending_value) = id(player_state).state;
+          - component.update: lcd
+          - homeassistant.action:
+              action: script.nfc_jukebox_control
+              data:
+                reader_id: ${reader_id}
+                command: toggle
+
+  - platform: touchscreen
+    id: touch_next
+    touchscreen_id: touch_panel
+    x_min: 214
+    x_max: 319
+    y_min: 165
+    y_max: 239
+    internal: true
+    on_press:
+      - if:
+          condition:
+            lambda: return id(api_status).state && id(progress_player_source).state == "matched";
+          then:
+          - lambda: |-
+              id(pending_button) = 3;
+              id(pending_since) = millis();
+              id(feedback_timeout_since) = 0;
+              id(pending_value) = id(media_identity).state + "|" + id(media_title).state;
+          - component.update: lcd
+          - homeassistant.action:
+              action: script.nfc_jukebox_control
+              data:
+                reader_id: ${reader_id}
+                command: next
+
+switch:
+  - platform: gpio
+    id: lcd_backlight
+    pin: GPIO1
+    restore_mode: ALWAYS_ON
+    internal: true
+
+font:
+  - file: "gfonts://Roboto"
+    id: font_label
+    size: 12
+    glyphsets:
+      - GF_Latin_Kernel
+      - GF_Latin_Core
+  - file: "gfonts://Roboto"
+    id: font_small
+    size: 14
+    glyphsets:
+      - GF_Latin_Kernel
+      - GF_Latin_Core
+  - file: "gfonts://Roboto@500"
+    id: font_body
+    size: 17
+    glyphsets:
+      - GF_Latin_Kernel
+      - GF_Latin_Core
+  - file: "gfonts://Roboto@700"
+    id: font_medium
+    size: 21
+    glyphsets:
+      - GF_Latin_Kernel
+      - GF_Latin_Core
+  - file: "gfonts://Roboto@700"
+    id: font_large
+    size: 28
+    glyphsets:
+      - GF_Latin_Kernel
+      - GF_Latin_Core
+
+color:
+  - id: background
+    hex: "0B0F14"
+  - id: surface
+    hex: "151B23"
+  - id: surface_alt
+    hex: "202A35"
+  - id: accent
+    hex: "14B8C4"
+  - id: accent_pressed
+    hex: "46D6DF"
+  - id: primary_text
+    hex: "F7F9FC"
+  - id: secondary_text
+    hex: "94A3B8"
+  - id: warning_text
+    hex: "F59E0B"
+  - id: button_fill
+    hex: "24303D"
+  - id: divider
+    hex: "2B3642"
+
+image:
+  - platform: online_image
+    id: media_cover
+    url: "http://127.0.0.1/cover.jpg"
+    format: JPEG
+    type: RGB565
+    byte_order: little_endian
+    resize: 104x104
+    update_interval: never
+    on_download_finished:
+      - lambda: id(cover_ready) = true;
+      - component.update: lcd
+    on_error:
+      - lambda: id(cover_ready) = false;
+      - component.update: lcd
+      - logger.log: "Albumcover konnte nicht geladen werden"
+
+display:
+  - platform: mipi_spi
+    id: lcd
+    model: ST7789V
+    spi_id: lcd_spi
+    cs_pin: GPIO45
+    dc_pin: GPIO42
+    dimensions: 240x320
+    rotation: 90
+    color_order: BGR
+    invert_colors: true
+    data_rate: 40MHz
+    update_interval: 100ms
+    lambda: |-
+      it.fill(id(background));
+      const int width = it.get_width();
+      const int height = it.get_height();
+      const bool playing = id(player_state).state == "playing";
+      const bool paused = id(player_state).state == "paused";
+      const bool connected = id(api_status).state;
+      const bool buffering = id(player_state).state == "buffering";
+      if (playing || paused || buffering) id(last_media_active_ms) = millis();
+      // Metadata can briefly clear between tracks. Do not show the
+      // empty-player prompt during that transition or while paused.
+      const bool media_active = playing || paused || buffering ||
+          id(pending_button) != 0 ||
+          (id(last_media_active_ms) != 0 &&
+           millis() - id(last_media_active_ms) < 5000);
+
+      // Only a relevant player change confirms the visible command effect.
+      if (id(pending_button) != 0) {
+        const auto current = id(pending_button) == 2
+            ? id(player_state).state
+            : id(media_identity).state + "|" + id(media_title).state;
+        if (id(pending_button) != 4 && current != id(pending_value)) {
+          id(pending_button) = 0;
+        } else if (millis() - id(pending_since) >= 8000) {
+          id(pending_button) = 0;
+          id(feedback_timeout_since) = millis();
+        }
+      }
+      const bool command_pending = id(pending_button) != 0;
+      const bool feedback_timeout = id(feedback_timeout_since) != 0 &&
+          millis() - id(feedback_timeout_since) < 2500;
+      const bool card_seen = id(last_scan_ms) != 0 &&
+                             (millis() - id(last_scan_ms)) < 2500;
+
+      auto fill_rounded = [&](int x, int y, int w, int h, int radius,
+                              auto color) {
+        it.filled_rectangle(x + radius, y, w - 2 * radius, h, color);
+        it.filled_rectangle(x, y + radius, w, h - 2 * radius, color);
+        it.filled_circle(x + radius, y + radius, radius, color);
+        it.filled_circle(x + w - radius - 1, y + radius, radius, color);
+        it.filled_circle(x + radius, y + h - radius - 1, radius, color);
+        it.filled_circle(x + w - radius - 1, y + h - radius - 1,
+                         radius, color);
+      };
+
+      // Track progress, extrapolated from HA's timestamp only while playing.
+      const bool progress_matches = id(progress_player_source).state == "matched";
+      const bool duration_known = progress_matches && std::isfinite(id(track_duration).state) &&
+                                  id(track_duration).state > 0;
+      const bool position_known = progress_matches && std::isfinite(id(track_position).state) &&
+                                  id(track_position).state >= 0;
+      double position = position_known ? id(track_position).state : 0;
+      const auto now = id(ha_clock).now();
+      if (id(progress_player_state).state == "playing" && position_known && now.is_valid() && id(position_epoch) > 0) {
+        const int64_t elapsed = static_cast<int64_t>(now.timestamp) - id(position_epoch);
+        if (elapsed > 0) position += elapsed;
+      }
+      const int duration = duration_known ? static_cast<int>(id(track_duration).state) : 0;
+      if (duration_known && position > duration) position = duration;
+      if (id(pending_button) == 4) position = id(seek_target_seconds);
+      const int seconds = static_cast<int>(position);
+      if (connected && position_known) {
+        it.printf(12, 5, id(font_small), id(primary_text), "%d:%02d",
+                  seconds / 60, seconds % 60);
+      } else {
+        it.print(12, 5, id(font_small), id(secondary_text), "--:--");
+      }
+      if (connected && duration_known) {
+        it.printf(width - 12, 5, id(font_small), id(secondary_text),
+                  TextAlign::TOP_RIGHT, "%d:%02d", duration / 60, duration % 60);
+      } else {
+        it.print(width - 12, 5, id(font_small), id(secondary_text),
+                 TextAlign::TOP_RIGHT, "--:--");
+      }
+      fill_rounded(12, 29, width - 24, 6, 3, id(surface_alt));
+      if (connected && duration_known && position_known) {
+        const int progress_width = static_cast<int>((width - 24) * position / duration);
+        if (progress_width > 0)
+          it.filled_rectangle(12, 29, progress_width, 6, id(accent));
+      }
+      // Echtes Cover; der kleine Tonträger bleibt als Fallback sichtbar.
+      fill_rounded(12, 50, 108, 112, 12, id(surface));
+      it.filled_circle(66, 106, 28, id(surface_alt));
+      it.filled_circle(66, 106, 9,
+                       playing ? id(accent) : id(secondary_text));
+      it.filled_circle(66, 106, 3, id(background));
+      if (id(cover_ready)) it.image(14, 54, id(media_cover));
+
+      if (!connected) {
+        it.print(132, 57, id(font_label), id(warning_text), "VERBINDUNG");
+        it.print(132, 79, id(font_medium), id(primary_text), "Home Assistant");
+        it.print(132, 108, id(font_medium), id(primary_text), "nicht verbunden");
+        it.print(132, 141, id(font_small), id(secondary_text),
+                 "WLAN / ESPHome prüfen");
+      } else if (command_pending || feedback_timeout) {
+        const char *action = id(pending_button) == 1 ? "ZURÜCK" :
+                             id(pending_button) == 2 ? "PLAY / PAUSE" :
+                             id(pending_button) == 4 ? "POSITION" : "WEITER";
+        it.print(132, 57, id(font_label), id(accent),
+                 command_pending ? action : "KEINE RÜCKMELDUNG");
+        it.print(132, 84, id(font_medium), id(primary_text),
+                 command_pending ? "Wird geladen ..." : "Bitte erneut");
+        it.print(132, 119, id(font_small), id(secondary_text),
+                 command_pending ? "Eingabe erkannt" : "versuchen");
+        if (command_pending) {
+          it.filled_rectangle(132, 145, 176, 4, id(surface_alt));
+          const int offset = ((millis() - id(pending_since)) / 12) % 145;
+          it.filled_rectangle(132 + offset, 145, 32, 4, id(accent));
+        }
+      } else if (card_seen) {
+        it.print(132, 57, id(font_label), id(accent), "NFC-KARTE ERKANNT");
+        it.print(132, 81, id(font_large), id(primary_text), "Wird geladen");
+        it.print(132, 119, id(font_small), id(secondary_text),
+                 id(last_tag).state.c_str());
+        it.filled_rectangle(132, 145, 116, 5, id(surface_alt));
+        it.filled_rectangle(132, 145, 76, 5, id(accent));
+      } else {
+        auto has_metadata = [](const std::string &value) {
+          return !value.empty() && value != "unknown" &&
+                 value != "unavailable" && value != "None";
+        };
+        const bool has_title = has_metadata(id(media_title).state);
+        const std::string title = has_title ? id(media_title).state :
+            (media_active ? "Wird geladen ..." : "Karte auflegen");
+        const std::string artist = has_metadata(id(media_artist).state)
+            ? id(media_artist).state :
+              (media_active || has_title ? "" : "Playlist auswählen");
+        const char *label = media_active && !has_title ? "WIRD GELADEN" :
+                            playing ? "JETZT LÄUFT" :
+                            (paused ? "PAUSIERT" : "BEREIT");
+        it.print(132, 57, id(font_label),
+                 playing ? id(accent) : id(secondary_text), label);
+
+        // Lange Titel laufen nahtlos durch den verfügbaren Bereich.
+        const int text_left = 132;
+        const int text_right = width - 12;
+        const int viewport_width = text_right - text_left;
+        int x1, y1, title_width, title_height;
+        it.get_text_bounds(0, 0, title.c_str(), id(font_medium),
+                           TextAlign::TOP_LEFT, &x1, &y1,
+                           &title_width, &title_height);
+        int title_x = text_left;
+        if (title_width > viewport_width) {
+          const int gap = 42;
+          const int offset = (millis() / 45) % (title_width + gap);
+          title_x -= offset;
+          it.start_clipping(text_left, 78, text_right, 111);
+          it.print(title_x, 79, id(font_medium), id(primary_text),
+                   title.c_str());
+          it.print(title_x + title_width + gap, 79, id(font_medium),
+                   id(primary_text), title.c_str());
+          it.end_clipping();
+        } else {
+          it.print(title_x, 79, id(font_medium), id(primary_text),
+                   title.c_str());
+        }
+
+        it.start_clipping(text_left, 132, text_right, 158);
+        it.print(text_left, 136, id(font_small), id(secondary_text),
+                 artist.c_str());
+        it.end_clipping();
+      }
+
+      // Drei reine Icon-Tasten: vorheriger Titel, Play/Pause, nächster Titel.
+      fill_rounded(12, 176, 90, 55, 14,
+          id(touch_restart).state ? id(surface_alt) : id(button_fill));
+      it.filled_rectangle(36, 191, 4, 24, id(primary_text));
+      it.filled_triangle(63, 190, 63, 216, 42, 203, id(primary_text));
+
+      fill_rounded(112, 176, 96, 55, 14,
+          id(touch_play_pause).state ? id(accent_pressed) : id(accent));
+      const auto play_icon = id(background);
+      if (playing) {
+        it.filled_rectangle(150, 190, 7, 26, play_icon);
+        it.filled_rectangle(164, 190, 7, 26, play_icon);
+      } else {
+        it.filled_triangle(151, 188, 151, 218, 175, 203, play_icon);
+      }
+
+      fill_rounded(218, 176, 90, 55, 14,
+          id(touch_next).state ? id(surface_alt) : id(button_fill));
+      it.filled_triangle(246, 190, 246, 216, 267, 203, id(primary_text));
+      it.filled_rectangle(270, 191, 4, 24, id(primary_text));
+
+      (void) height;
+
+touchscreen:
+  - platform: cst816
+    id: touch_panel
+    i2c_id: touch_i2c
+    display: lcd
+    address: 0x15
+    update_interval: 50ms
+    calibration:
+      x_min: 0
+      x_max: 320
+      y_min: 0
+      y_max: 240
+    transform:
+      swap_xy: true
+      mirror_x: false
+      mirror_y: true
+    on_touch:
+      - lambda: |-
+          ESP_LOGI("touch", "x=%d y=%d raw_x=%d raw_y=%d",
+                   touch.x, touch.y, touch.x_raw, touch.y_raw);
+      - if:
+          condition:
+            lambda: |-
+              return touch.y <= 43 && touch.x >= 12 && touch.x <= 307 &&
+                     id(api_status).state &&
+                     id(progress_player_source).state == "matched" &&
+                     (id(progress_player_state).state == "playing" ||
+                      id(progress_player_state).state == "paused") &&
+                     std::isfinite(id(track_duration).state) &&
+                     id(track_duration).state > 1 &&
+                     (id(last_seek_touch_ms) == 0 ||
+                      millis() - id(last_seek_touch_ms) > 600);
+          then:
+            - lambda: |-
+                // ~1 cm at the left of this 2-inch landscape screen restarts.
+                const float duration = id(track_duration).state;
+                const float target = touch.x <= 90 ? 0.0f :
+                    (touch.x - 12) * duration / 296.0f;
+                id(seek_target_seconds) = std::min(target, duration - 1.0f);
+                id(last_seek_touch_ms) = millis();
+                id(pending_since) = millis();
+                id(pending_button) = 4;
+                id(feedback_timeout_since) = 0;
+                ESP_LOGI("control", "Seek requested: %.1f seconds", id(seek_target_seconds));
+            - component.update: lcd
+            - homeassistant.action:
+                action: script.nfc_jukebox_control
+                data:
+                  reader_id: ${reader_id}
+                  command: seek
+                  seek_position: !lambda return to_string(id(seek_target_seconds));

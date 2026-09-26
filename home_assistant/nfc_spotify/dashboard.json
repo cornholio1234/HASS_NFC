@@ -1,0 +1,1 @@
+{"title":"NFC Karten","views":[{"title":"Karten anlernen","path":"anlernen","icon":"mdi:cards","type":"panel","cards":[{"type":"custom:nfc-card-enroller"}]}]}

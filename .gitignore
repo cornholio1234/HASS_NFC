@@ -1,0 +1,28 @@
+# Local credentials / private operational data
+credentials.env
+.env
+.env.*
+!.env.example
+**/secrets.yaml
+**/secrets.*.yaml
+!**/secrets.example.yaml
+*.pem
+*.key
+id_ed25519*
+CODEX_HANDOFF*
+diagnostics/
+backups/
+*.log
+# Build tools and outputs
+.venv/
+__pycache__/
+*.pyc
+.esphome/
+.pioenvs/
+.piolibdeps/
+node_modules/
+enclosure/tools/
+*.bin
+*.elf
+.DS_Store
+Thumbs.db

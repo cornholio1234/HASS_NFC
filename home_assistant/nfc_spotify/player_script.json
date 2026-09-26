@@ -1,0 +1,111 @@
+{
+  "alias": "NFC Jukebox – Karte abspielen",
+  "description": "Kartenverwaltung im Dashboard NFC Karten. card_map ist die einzige aktive Zuordnung.",
+  "mode": "parallel",
+  "fields": {
+    "tag_id": {
+      "name": "Kartenkennung",
+      "required": true,
+      "selector": {
+        "text": {}
+      }
+    },
+    "reader_id": {
+      "name": "Reader-ID",
+      "required": true,
+      "selector": {
+        "text": {}
+      }
+    }
+  },
+  "variables": {
+    "card_map": {},
+    "card": "{{ card_map.get(tag_id | default('') | upper, {}) }}",
+    "media_uri": "{{ card.get('uri', '') }}",
+    "profile": "{{ (state_attr('sensor.nfc_jukebox_profiles', 'profiles') or {}).get(reader_id | default(''), {}) }}",
+    "default_player": "{{ profile.get('player', '') }}",
+    "spotify_source": "{{ profile.get('source', '') }}"
+  },
+  "sequence": [
+    {
+      "condition": "template",
+      "value_template": "{{ profile and (state_attr('sensor.nfc_jukebox_sessions', 'leases') or {}).get(reader_id, 0) | float(0) <= as_timestamp(now()) }}"
+    },
+    {
+      "condition": "template",
+      "value_template": "{{ media_uri is string and media_uri | regex_match('^spotify:(playlist|album|track):[A-Za-z0-9]{22}$') }}"
+    },
+    {
+      "condition": "template",
+      "value_template": "{{ spotify_source in (state_attr(default_player, 'source_list') or []) }}"
+    },
+    {
+      "action": "media_player.select_source",
+      "target": {
+        "entity_id": "{{ default_player }}"
+      },
+      "data": {
+        "source": "{{ spotify_source }}"
+      }
+    },
+    {
+      "if": [
+        {
+          "condition": "template",
+          "value_template": "{{ card.get('kind', 'music') != 'audiobook' and profile.get('music_shuffle', 'keep') in ['on', 'off'] }}"
+        }
+      ],
+      "then": [
+        {
+          "action": "media_player.shuffle_set",
+          "target": {
+            "entity_id": "{{ default_player }}"
+          },
+          "data": {
+            "shuffle": "{{ profile.get('music_shuffle') == 'on' }}"
+          }
+        }
+      ]
+    },
+    {
+      "if": [
+        {
+          "condition": "template",
+          "value_template": "{{ card.get('kind', 'music') == 'audiobook' }}"
+        }
+      ],
+      "then": [
+        {
+          "action": "media_player.shuffle_set",
+          "target": {
+            "entity_id": "{{ default_player }}"
+          },
+          "data": {
+            "shuffle": false
+          }
+        },
+        {
+          "action": "homeassistant.update_entity",
+          "target": {
+            "entity_id": "{{ default_player }}"
+          }
+        }
+      ]
+    },
+    {
+      "condition": "template",
+      "value_template": "{{ card.get('kind', 'music') != 'audiobook' or state_attr(default_player, 'shuffle') == false }}"
+    },
+    {
+      "action": "media_player.play_media",
+      "target": {
+        "entity_id": "{{ default_player }}"
+      },
+      "data": {
+        "media_content_id": "{{ media_uri }}",
+        "media_content_type": "{{ media_uri.split(':')[1] }}"
+      }
+    }
+  ],
+  "max": 20
+}

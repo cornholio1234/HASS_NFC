@@ -1,0 +1,31 @@
+{
+  "alias": "NFC Jukebox – Reader-Anlernmodus",
+  "mode": "queued",
+  "max": 30,
+  "fields": {
+    "reader_id": {
+      "required": true
+    },
+    "seconds": {
+      "required": true
+    }
+  },
+  "sequence": [
+    {
+      "condition": "template",
+      "value_template": "{{ reader_id in (state_attr('sensor.nfc_jukebox_profiles', 'profiles') or {}) }}"
+    },
+    {
+      "event": "nfc_jukebox_session",
+      "event_data": {
+        "reader_id": "{{ reader_id }}",
+        "until": "{{ as_timestamp(now()) + ([seconds | float(0), 90] | min) }}"
+      }
+    },
+    {
+      "delay": {
+        "milliseconds": 100
+      }
+    }
+  ]
+}

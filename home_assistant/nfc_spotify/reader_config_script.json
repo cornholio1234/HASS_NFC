@@ -1,0 +1,15 @@
+{
+  "alias": "NFC Jukebox – Reader-Konfiguration",
+  "mode": "queued",
+  "variables": {
+    "profiles": {}
+  },
+  "sequence": [
+    {
+      "event": "nfc_jukebox_profiles_updated",
+      "event_data": {
+        "profiles": "{{ profiles }}"
+      }
+    }
+  ]
+}
