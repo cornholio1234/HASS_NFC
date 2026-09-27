@@ -120,12 +120,19 @@ interval:
   - interval: 1s
     then:
       - lambda: |-
-          const bool rainbow = id(api_status).state && id(progress_player_state).state == "playing";
-          if (rainbow != id(playback_led).remote_values.is_on()) {
+          // Log-only API clients must not hide a lost Home Assistant connection.
+          const bool connected = esphome::api::global_api_server->is_connected_with_state_subscription();
+          const int mode = !connected ? 2 : (id(progress_player_state).state == "playing" ? 1 : 0);
+          static int previous_mode = -1;
+          if (mode != previous_mode) {
             auto call = id(playback_led).make_call();
-            call.set_state(rainbow);
-            if (rainbow) { call.set_brightness(0.25f); call.set_effect("Playback Rainbow"); }
+            call.set_state(mode != 0);
+            call.set_brightness(0.25f);
+            call.set_effect(mode == 1 ? "Playback Rainbow" : "None");
+            if (mode == 2) call.set_rgb(1.0f, 0.0f, 0.0f);
             call.perform();
+            previous_mode = mode;
+            ESP_LOGI("playback_led", "Mode: %s", mode == 2 ? "disconnected red" : mode == 1 ? "playback rainbow" : "off");
           }
           const float timeout = id(progress_player_state).state == "playing" ? id(display_timeout_playing).state : id(display_timeout_idle).state;
           if (id(lcd_backlight).state &&
