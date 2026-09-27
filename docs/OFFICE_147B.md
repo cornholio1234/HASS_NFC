@@ -5,9 +5,9 @@ artist and progress on a 320 × 172 landscape screen. There are no touch buttons
 seek zones or media-control action handlers. A card scan still starts playback
 through the shared Home Assistant card library and this reader's own profile.
 
-**Status:** firmware compiled successfully with ESPHome 2026.9.0. It has not yet
-been flashed or tested on this physical board. Display orientation/colors, motion
-wake sensitivity and RC522 operation still need verification.
+**Status:** built with ESPHome 2026.9.0, flashed to the project board and connected
+to Home Assistant. OTA updates and configurable timeout values have been verified.
+Motion-wake sensitivity and physical enclosure fit still need verification.
 
 ## Exact hardware variant
 
@@ -44,7 +44,7 @@ The firmware uses a separate SPI bus at 1 MHz for the reader. Board-reserved pin
 | LCD CS / DC / reset | 42 / 41 / 39 |
 | LCD backlight | 46 |
 | QMI8658 SDA / SCL | 48 / 47 |
-| RGB LED | 38, unused by this firmware |
+| RGB LED | 38, playback rainbow / connection status |
 | SD card | 14, 15, 16, 17, 18, 21, unused by this firmware |
 
 ## Firmware and pairing
@@ -63,7 +63,9 @@ Source: [nfc_office_147b.yaml](../esphome/nfc_office_147b.yaml).
    Assistant actions. Copy its HA device ID from `/config/devices/device/<ID>` into
    the `reader_id` substitution, then rebuild and upload through OTA.
 5. In **NFC Cards → Configuration → Pair another reader**, select the new device,
-   its Spotify account and the office speaker. Save the pairing.
+   its playback backend and the office speaker. For Spotify Connect, select the
+   Spotify account and source; for Music Assistant, select the target player entity.
+   Save the pairing.
 6. Scan a known card. The shared library already contains its content; no duplicate
    card enrollment is needed. Verify that playback goes to the intended speaker.
 
@@ -71,7 +73,7 @@ Until a matching profile exists, the display shows **Pair reader in Home Assista
 Separate simultaneous playback requires separate Spotify accounts. A new reader
 does not alter the existing reader's profile automatically.
 
-Display timeouts can be set per reader in NFC Cards → Configuration: one for playback and one for paused/stopped playback. Both default to 60 seconds; 0 keeps the display on. Values persist on the device. A playback-state change restarts the inactivity timer. The onboard RGB LED cycles through rainbow colors at 25% brightness while the assigned player is playing and turns off while paused/stopped. A missing Home Assistant state subscription takes priority and lights the LED solid red; log-only API connections do not count as Home Assistant.
+Display timeouts can be set per reader in NFC Cards → Configuration: one for playback and one for paused/stopped playback. Both default to 60 seconds; 0 keeps the display on. Values persist on the device. A playback-state change restarts the inactivity timer. The onboard RGB LED cycles through rainbow colors at **100% brightness** while the assigned player is playing and turns off while paused/stopped. A missing Home Assistant state subscription takes priority and lights the LED solid red at 25% brightness; log-only API connections do not count as Home Assistant.
 NFC, Wi-Fi and playback continue. Nudge the device or scan a card to wake it. This
 board has no touch sensor, so touching stationary glass alone cannot wake it.
 The provisional motion threshold is a 0.18 g change from a moving baseline.

@@ -1,8 +1,9 @@
 # HASS NFC Jukebox
 
 **Scan a card. Play an audiobook or music.** An ESP32 with an NFC reader starts
-Spotify on your chosen speaker. Home Assistant manages the cards and pairs each
-reader with a Spotify account and speaker.
+Spotify content on your chosen speaker through Spotify Connect or Music Assistant.
+Home Assistant manages the cards and pairs each reader with its playback backend
+and fixed target speaker.
 
 This is a working DIY project, not a finished plug-and-play product. The published
 firmware, dashboard and documentation are in English. **The rC enclosure is a
@@ -22,13 +23,35 @@ printing instructions before printing it.**
   in the Configuration tab (0 = always on; default 60 seconds each). Settings
   persist on the device. Wake by movement or a new card; the 2-inch board also
   supports touch wake without triggering playback controls. The office RGB LED
-  cycles through rainbow colors during playback.
+  runs a rainbow at **100% brightness** during playback, turns off when paused or
+  stopped, and shows solid red when the Home Assistant state connection is missing.
 
 **Music Assistant is optional.** In Configuration, each reader can use either
 Spotify Connect (account plus speaker) or Music Assistant (its target player).
 Music Assistant must have the Spotify provider configured to resolve the same card
 links. Its provider accounts are managed in Music Assistant. A computer is needed
 for setup, not daily operation.
+
+## Home Assistant and firmware included
+
+The repository includes the Home Assistant implementation and **both** ESPHome
+firmware configurations, not just the dashboard or enclosure:
+
+| Component | Source | Current behavior |
+|---|---|---|
+| HA package | [nfc_spotify.yaml](home_assistant/packages/nfc_spotify.yaml) | NFC routing, reader state and display feedback |
+| Playback | [player_script.json](home_assistant/nfc_spotify/player_script.json) | Spotify Connect or Music Assistant per reader; fixed target player; audiobook shuffle off |
+| Reader configuration | [reader_config_script.json](home_assistant/nfc_spotify/reader_config_script.json) | Separate reader profiles and speaker pairings |
+| Controls and enrollment | [reader_control_script.json](home_assistant/nfc_spotify/reader_control_script.json), [reader_session_script.json](home_assistant/nfc_spotify/reader_session_script.json) | Playback controls and per-reader enrollment locks |
+| Dashboard | [nfc-card-enroller.js](home_assistant/nfc_spotify/nfc-card-enroller.js) | Batch enrollment, automatic titles, searchable card table and reader configuration |
+| 2-inch touch display | [nfc_spotify_player.yaml](esphome/nfc_spotify_player.yaml) | Touch controls, filtered touch input, progress/seeking, cover loading and configurable sleep |
+| 1.47B-M office display | [nfc_office_147b.yaml](esphome/nfc_office_147b.yaml) | Display-only reader, configurable sleep, full-brightness rainbow and red connection indicator |
+
+Both boards have been flashed in the project installation and reconnected to Home
+Assistant. This is not a complete hardware acceptance test: simultaneous independent
+playback, motion sensitivity and enclosure fit still need physical verification.
+Personal credentials, reader IDs, speaker profiles and card mappings are excluded.
+Supply these for your own installation; precompiled firmware is not published.
 
 ## Hardware and requirements
 
@@ -37,7 +60,8 @@ Two firmware variants are available:
 - **2-inch touch jukebox:** the hardware and wiring below.
 - **1.47B-M office reader, without controls:** [pinout, firmware and setup](docs/OFFICE_147B.md),
   plus a [70 × 50 × 40 mm screwless enclosure](enclosure/office-147b/r0/README.md).
-  The office firmware has compiled; board testing and physical enclosure fit are pending.
+  The office firmware has been flashed and connected to Home Assistant; physical
+  enclosure fit is still unverified.
   Its display wakes on movement or a new card scan, not stationary touch.
 
 The original touch firmware targets this hardware:
@@ -48,8 +72,8 @@ The original touch firmware targets this hardware:
 | Motion sensor | Onboard QMI8658, I²C address 0x6B |
 | NFC reader | RC522 / MFRC522 over SPI, powered at 3.3 V |
 | Cards | RC522-compatible 13.56 MHz cards/tags, such as MIFARE Classic |
-| Speaker | A Spotify Connect device available to the selected account |
-| Controller | Home Assistant with native Spotify integration and ESPHome |
+| Speaker | A Spotify Connect device or a Music Assistant player |
+| Controller | Home Assistant, ESPHome, and Spotify integration or Music Assistant |
 
 Developed with **ESPHome 2026.9.0**. Other display boards, touch controllers and
 RC522 variants are not automatically compatible. Card IDs must use the format
@@ -74,18 +98,21 @@ These pins apply to the **2-inch Touch-LCD-2 only**. For the 1.47B-M, use the
 | IRQ | Not connected | – |
 
 **SDA is the SPI chip-select here, not an I²C connection.** Power the RC522 at 3.3 V.
-Colors are only a reference; follow the pin labels. These pins cannot be shared
-with a connected camera.
+These pins cannot be shared with a connected camera.
 
 ## Setup
 
-### 1. Set up Spotify in Home Assistant
+### 1. Set up the playback backend
 
-Configure the [native Spotify integration](https://www.home-assistant.io/integrations/spotify/)
+For **Spotify Connect**, configure the [native Spotify integration](https://www.home-assistant.io/integrations/spotify/)
 for each account you want to use. First check that its `media_player` exists in
 Home Assistant and that the target speaker appears in its source list. If Spotify
 does not know the speaker yet, select it once in Spotify Connect. Current OAuth
 and developer-app requirements are covered by the linked integration guide.
+
+For **Music Assistant**, configure its Spotify provider and add its integration to
+Home Assistant. The target speaker must have a Music Assistant `media_player`
+entity. This backend does not need a native Spotify entity for the reader.
 
 ### 2. Copy the Home Assistant files
 
@@ -128,9 +155,16 @@ The card library and reader profiles start empty. Open `/nfc-cards/enroll`.
 Existing dashboards, including legacy routes, are preserved by the installer.
 
 This is a **first-install helper**, not a migration tool. Back up existing
-installations and review changes before updating.
+installations and review changes before updating. In particular, preserve live
+`variables.card_map` in the playback script and reader profiles in the reader
+configuration script: repository templates start empty. Updating only the
+dashboard JavaScript does not update the HA scripts or ESPHome firmware. See
+[architecture and update boundaries](docs/ARCHITECTURE.md).
 
 ### 4. Set up the ESPHome panel
+
+For the **1.47B-M**, follow its [firmware and pairing guide](docs/OFFICE_147B.md#firmware-and-pairing).
+The following steps target the **2-inch touchscreen**.
 
 1. Copy `esphome/nfc_spotify_player.yaml` and `esphome/components/` into your ESPHome
    configuration directory, preserving the relative component path.
@@ -157,8 +191,10 @@ Other NFC readers without displays can be used if they send compatible
 Open **NFC Cards → Configuration → Pair another reader**:
 
 1. Select the NFC reader and give it a name.
-2. Select the Spotify player/account.
-3. Select the target speaker.
+2. Select **Playback via**: Spotify Connect or Music Assistant.
+3. For Spotify Connect, select the account/player and its target speaker. For Music
+   Assistant, select the target speaker/player entity directly; provider accounts
+   are configured in Music Assistant. Scans and controls use this fixed pairing.
 4. Choose the default type for new cards and shuffle behavior for music.
 5. Click **Save pairing**.
 
@@ -181,10 +217,14 @@ Scans from this reader do not start playback during enrollment. Other readers
 remain available. Drafts survive stopping and switching tabs. Previously saved
 cards are replaced only through explicit reassignment.
 
-In **Saved cards**, search by UID/title/type, sort, use the pencil to rename, open
+In **Saved cards**, search by UID/title/type. Click the ID, Title, Type or Assigned
+column header to cycle **ascending → descending → default (title A–Z)**. New
+assignments record their timestamp; old cards without one sort last by date.
+Reconstructed dates are marked **≈**. Use the pencil to rename, open
 Spotify with the link icon, or remove a mapping with the red ×. **Undo deletion**
 works in the same browser. The physical card is neither written nor erased.
-**Inspect cards** shows IDs and titles without starting playback.
+**Inspect cards**, in the **Enroll** tab, shows IDs and titles without starting
+playback. Saved cards has no duplicate reader selector or inspection controls.
 
 ## 3D enclosure rC
 
@@ -207,15 +247,15 @@ older parts are not compatible.
 
 ## Limitations and troubleshooting
 
-- Only one physical reader has been tested. Multiple profiles, per-reader enrollment
-  locks and routing are implemented/tested, but simultaneous playback with two
-  physical readers has not been verified.
+- Both display variants are deployed in the project installation. Multiple profiles,
+  per-reader enrollment locks and routing are implemented/tested; simultaneous
+  independent playback with two physical readers has not been verified.
 - Spotify/Home Assistant feedback has latency. Progress is extrapolated locally
   between position updates.
 - The local touch driver filters implausible raw values. It does not establish or
   fix their electrical cause, and cannot reject every possible ghost touch.
-- The backlight timeout/motion wake addition is compiled but not yet tested on the
-  device. Motion sensitivity is a provisional 0.18 g deviation from a moving baseline.
+- Separate playback and pause/stop timeouts are deployed on both boards. Physical
+  motion-wake sensitivity remains provisional: 0.18 g deviation from a moving baseline.
 - No automatic audiobook resume across card changes.
 - Missing speakers: check the account and Spotify Connect availability first.
 - No scans: check power, SPI wiring and ESPHome logs, then the device ID and reader
