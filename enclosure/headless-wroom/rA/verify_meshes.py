@@ -38,11 +38,16 @@ def overlap(a, b):
         return abs(float(intersection(a,b).volume))
 
 checks = {
-    "esp_pcb": ([10,7,29.6], [27.94,48.26,1.6]),
-    "esp_components_and_buttons": ([11,7,31.2], [25.94,54.3,8]),
-    "esp_left_plugs_and_wire_bends": ([9,8,6], [5,49,23.6]),
-    "esp_right_plugs_and_wire_bends": ([34,8,6], [5,49,23.6]),
-    "usb_plug_insertion": ([12,-20,27], [24,27,12]),
+    "esp_pcb": ([10,7,18], [27.94,48.26,1.6]),
+    "esp_components_and_buttons": ([11,8.1,19.6], [25.94,46.16,8]),
+    "esp_antenna_overhang": ([14.97,54.26,19.6], [18,7.04,8]),
+    "esp_left_upward_headers": ([9.77,7,19.6], [3,48.26,12]),
+    "esp_right_upward_headers": ([35.17,7,19.6], [3,48.26,12]),
+    "esp_left_wire_bends": ([9,7,31.6], [5,48.26,12]),
+    "esp_right_wire_bends": ([34,7,31.6], [5,48.26,12]),
+    "esp_left_solder_tails": ([9.77,7,16], [3,48.26,2]),
+    "esp_right_solder_tails": ([35.17,7,16], [3,48.26,2]),
+    "usb_plug_insertion": ([16.97,-20,15.2], [14,27,12]),
     "rc522_pcb": ([48,10,40.8], [40,60,1.6]),
     "rc522_components": ([50,10,32.8], [36,60,8]),
     "rc522_plugs_and_wire_bends": ([54,8,13], [30,12,27.8]),
@@ -85,7 +90,8 @@ assert worst < .001, worst
 report["cover_lift_after_latch_release"] = {"sampled_positions":51,"maximum_overlap_mm3":worst}
 report["mounting"] = {"pcb_clips_per_board":4,"pcb_thickness_mm":1.6,"roof_minimum_mm":1.3,
                       "floor_mm":3.6,"pcb_clip_leaf_mm":2.4,"pcb_clip_root_mm":3.2,
-                      "pcb_clip_widths_mm":{"esp32":12,"rc522":10},
+                      "esp_clip_root_width_mm":8.5,"rc522_clip_width_mm":10,
+                      "esp_pcb_bottom_mm":18,"esp_connector_direction":"up",
                       "latch_deflection_mm":.6,"latch_vertical_clearance_mm":.2,
                       "pcb_clamping_preload_mm":0}
 report["scope"] = "Nominal geometry and clearance checks. Printed clip fit, retention force and hardware fit require a physical assembly."

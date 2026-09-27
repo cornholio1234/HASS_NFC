@@ -241,8 +241,8 @@ Assistant integration clients supplied with Home Assistant.
 The [ESP32-WROOM / RC522 enclosure](enclosure/headless-wroom/rA/README.md) measures
 96 × 82 × 46 mm and consists of a base and a removable cover. Four latches secure
 the housing; four printed edge clips retain each PCB on its supports. Both boards
-stay on the base when the cover is removed. The open base provides access to both
-ESP32 header rows. CAD, print-ready STLs, assembly views and clearance checks are
+stay on the base when the cover is removed. The ESP32 sits low with upward-facing
+headers and an aligned USB opening. CAD, print-ready STLs, assembly views and clearance checks are
 included. It uses the standard AZ-Delivery ESP32 Dev Kit C V4 layout.
 
 ## 3D enclosure rC

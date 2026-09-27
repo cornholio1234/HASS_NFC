@@ -5,7 +5,7 @@ part = "assembly"; // base, cover, plate, assembly, exploded, inside, base_check
 W=96; D=82; H=46;
 wall=2.4; floor_t=3.6; seam=4.4; roof=1.6;
 eps=0.02; radius=4;
-esp_x=10; esp_y=7; esp_w=27.94; esp_l=48.26; esp_z=29.6; pcb_t=1.6;
+esp_x=10; esp_y=7; esp_w=27.94; esp_l=48.26; esp_z=18; pcb_t=1.6;
 rc_x=48; rc_y=10; rc_w=40; rc_l=60; rc_z=40.8;
 clip_y=[22,60]; clip_w=8; clip_top=25.8;
 $fn=48;
@@ -15,6 +15,9 @@ module rounded(w,d,h,r){linear_extrude(height=h)offset(r=r)
   translate([r,r])square([w-2*r,d-2*r]);}
 module xz_shape(points,y,width){
   translate([0,y+width,0])rotate([90,0,0])linear_extrude(height=width)polygon(points);
+}
+module yz_shape(points,x,width){
+  translate([x,0,0])rotate([90,0,90])linear_extrude(height=width)polygon(points);
 }
 module side(right=false){translate([right ? W:0,0,0])scale([right ? -1:1,1,1])children();}
 
@@ -51,17 +54,32 @@ module pcb_clip(edge,y,z,inward,width=12){
               [.8,z+pcb_t+.4],[-.2,z+pcb_t+1.4],[-1.42,z+pcb_t+1.4]],0,width);
   }
 }
+// ESP32 short-edge clips leave the upward header housings unobstructed.
+// Wide roots support narrower contact toes between headers, USB and antenna.
+module esp_end_clip(x,y,inward,toe,tip_w,upper,upper_w){
+  translate([x,y,0])scale([1,inward,1]){
+    box(0,-3.8,floor_t-eps,8.5,2.4,esp_z+pcb_t-floor_t+eps);
+    box(upper,-3.8,esp_z+pcb_t-eps,upper_w,2.4,1.4+eps);
+    yz_shape([[-4.6,3.5],[-1.4,3.5],[-1.4,6],[-3.8,6]],0,8.5);
+    hull(){box(-2,-4.6,3.5,12.5,4,.2);box(0,-3.8,5.6,8.5,2.4,.2);}
+    yz_shape([[-1.42,esp_z],[0,esp_z+pcb_t-.02],
+              [0,esp_z+pcb_t],[-1.42,esp_z+pcb_t]],toe,tip_w);
+    yz_shape([[-1.42,esp_z+pcb_t],[.5,esp_z+pcb_t],
+              [.5,esp_z+pcb_t+.4],[-.5,esp_z+pcb_t+1.4],
+              [-1.42,esp_z+pcb_t+1.4]],toe,tip_w);
+  }
+}
 module pcb_mounts(){
   for(y=[24,44])box(17,y,floor_t-eps,14,10,esp_z-floor_t+eps);
-  for(y=[18,42]){
-    pcb_clip(esp_x,y,esp_z,1);
-    pcb_clip(esp_x+esp_w,y,esp_z,-1);
+  for(y=[24,44]){
+    box(7,y,floor_t-eps,2.5,8,esp_z-floor_t+eps);
+    box(esp_x+esp_w+.5,y,floor_t-eps,2.5,8,esp_z-floor_t+eps);
+    for(x=[7,esp_x+esp_w])box(x,y,esp_z,3,8,pcb_t);
   }
-  // End stops leave the complete USB plug corridor and both buttons clear.
-  for(x=[7,37])box(x,3,floor_t-eps,4,4,esp_z+1.2-floor_t+eps);
-  // Flexible rear stops accommodate small PCB length tolerances.
-  // ESP32 antenna overhang passes above this stop.
-  box(17,esp_y+esp_l,floor_t-eps,14,1.6,esp_z+1.2-floor_t+eps);
+  esp_end_clip(8,esp_y,1,5,3.5,0,8.5);
+  esp_end_clip(31.5,esp_y,1,0,3.5,0,8.5);
+  esp_end_clip(8,esp_y+esp_l,-1,5,1.6,0,6.6);
+  esp_end_clip(31.5,esp_y+esp_l,-1,1.9,1.6,1.9,6.6);
 
   // RC522 underside support: 2 mm of the bare long PCB edges.
   for(x=[46,86])for(y=[34,64])box(x,y,floor_t-eps,4,6,rc_z-floor_t+eps);
@@ -78,7 +96,7 @@ module base(){union(){
   difference(){rounded(W,D,seam,radius);
     translate([wall,wall,floor_t])rounded(W-2*wall,D-2*wall,seam,1.6);}
   // This tongue closes the lower part of the open-ended USB cutout.
-  box(10.35,0,seam-eps,27.3,wall,25.6-seam+eps);
+  box(10.35,0,seam-eps,27.3,wall,14-seam+eps);
   pcb_mounts();
   for(right=[false,true])side(right)for(y=clip_y)latch(y);
   // Housing alignment stops. All stop loads terminate in the floor.
@@ -89,7 +107,7 @@ module cover_shell(){difference(){
   translate([0,0,seam])rounded(W,D,H-seam,radius);
   translate([wall,wall,seam-eps])rounded(W-2*wall,D-2*wall,H-roof-seam+eps,1.6);
   // Open-ended port cutout: plug body clearance and no bridge in print position.
-  box(10,-eps,seam-eps,28,wall+2*eps,40-seam+eps);
+  box(10,-eps,seam-eps,28,wall+2*eps,30-seam+eps);
   for(right=[false,true])side(right)for(y=clip_y)
     box(-eps,y-0.6,23.0,wall+2*eps,clip_w+1.2,3.2);
   for(x=[20:8:76])box(x,D-wall-eps,10,2,wall+2*eps,12);
@@ -104,9 +122,9 @@ module esp(){
   color([0.1,0.28,0.22])box(esp_x,esp_y,esp_z,esp_w,esp_l,pcb_t);
   color([0.65,0.67,0.69])box(14.97,35,esp_z+pcb_t,18,20.26,3.2);
   color([0.12,0.25,0.18])box(14.97,esp_y+esp_l,esp_z+pcb_t,18,6.04,1);
-  color([0.14,0.16,0.19])for(x=[10,35.4])box(x,esp_y,esp_z-2.5,2.54,48.26,2.5);
+  color([0.14,0.16,0.19])for(x=[10,35.4])box(x,esp_y,esp_z+pcb_t,2.54,48.26,2.5);
   color([0.7,0.57,0.25])for(x=[11.27,36.67])for(y=[8.29:2.54:54.02])
-    box(x-.32,y-.32,esp_z-8,.64,.64,8);
+    box(x-.32,y-.32,esp_z-2,.64,.64,12);
   color([0.65,0.67,0.69])box(19,5,esp_z+pcb_t,10,7,3.2);
   color([0.2,0.2,0.23])for(x=[12,30])box(x,9,esp_z+pcb_t,5,4,3);
 }
@@ -119,7 +137,8 @@ module rfid(){
 }
 module cables(){
   // Nominal mated header/socket and wire-bend envelopes, not solid parts.
-  color([0.8,0.32,0.12,.25])for(x=[9,34])box(x,8,6,5,49,esp_z-6);
+  color([0.8,0.32,0.12,.25])for(x=[9.77,35.17])box(x,7,esp_z+pcb_t,3,48.26,12);
+  color([0.8,0.32,0.12,.25])for(x=[9,34])box(x,7,esp_z+pcb_t+12,5,48.26,12);
   color([0.8,0.32,0.12,.25])box(54,8,13,30,12,rc_z-13);
 }
 module electronics(){esp();rfid();}
