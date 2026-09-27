@@ -120,10 +120,19 @@ interval:
   - interval: 1s
     then:
       - lambda: |-
+          const bool rainbow = id(api_status).state && id(progress_player_state).state == "playing";
+          if (rainbow != id(playback_led).remote_values.is_on()) {
+            auto call = id(playback_led).make_call();
+            call.set_state(rainbow);
+            if (rainbow) { call.set_brightness(0.25f); call.set_effect("Playback Rainbow"); }
+            call.perform();
+          }
+          const float timeout = id(progress_player_state).state == "playing" ? id(display_timeout_playing).state : id(display_timeout_idle).state;
           if (id(lcd_backlight).state &&
-              uint32_t(millis() - id(display_activity_ms)) >= 60000UL) {
+              timeout > 0 &&
+              uint32_t(millis() - id(display_activity_ms)) >= uint32_t(timeout * 1000)) {
             id(lcd_backlight).turn_off();
-            ESP_LOGI("display_idle", "Backlight off after 60s inactivity");
+            ESP_LOGI("display_idle", "Backlight off after %.0fs inactivity", timeout);
           }
 
 motion:
@@ -212,6 +221,9 @@ text_sensor:
     id: progress_player_state
     update_interval: never
     internal: true
+    on_value:
+      then:
+        - script.execute: wake_display
   - platform: template
     id: progress_player_source
     update_interval: never
@@ -436,3 +448,51 @@ display:
         it.printf(310, 155, id(font_small), id(secondary_text), TextAlign::TOP_RIGHT,
                   "%d:%02d",int(duration)/60,int(duration)%60);
       }
+
+number:
+  - platform: template
+    id: display_timeout_playing
+    name: Display Timeout Playing
+    entity_category: config
+    unit_of_measurement: s
+    min_value: 0
+    max_value: 1800
+    step: 10
+    initial_value: 60
+    restore_value: true
+    optimistic: true
+    mode: box
+    on_value:
+      then:
+        - script.execute: wake_display
+  - platform: template
+    id: display_timeout_idle
+    name: Display Timeout Idle
+    entity_category: config
+    unit_of_measurement: s
+    min_value: 0
+    max_value: 1800
+    step: 10
+    initial_value: 60
+    restore_value: true
+    optimistic: true
+    mode: box
+    on_value:
+      then:
+        - script.execute: wake_display
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: playback_led
+    pin: GPIO38
+    num_leds: 1
+    chipset: WS2812
+    channel_colors: GRB
+    internal: true
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+    effects:
+      - addressable_rainbow:
+          name: Playback Rainbow
+          speed: 12
+          width: 1

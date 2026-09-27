@@ -71,7 +71,7 @@ Until a matching profile exists, the display shows **Pair reader in Home Assista
 Separate simultaneous playback requires separate Spotify accounts. A new reader
 does not alter the existing reader's profile automatically.
 
-The screen goes dark after 60 seconds without detected movement or a new card scan.
+Display timeouts can be set per reader in NFC Cards → Configuration: one for playback and one for paused/stopped playback. Both default to 60 seconds; 0 keeps the display on. Values persist on the device. A playback-state change restarts the inactivity timer. The onboard RGB LED cycles through rainbow colors at 25% brightness while the assigned player is playing and turns off while paused, stopped or disconnected.
 NFC, Wi-Fi and playback continue. Nudge the device or scan a card to wake it. This
 board has no touch sensor, so touching stationary glass alone cannot wake it.
 The provisional motion threshold is a 0.18 g change from a moving baseline.

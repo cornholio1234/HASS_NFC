@@ -130,10 +130,12 @@ interval:
   - interval: 1s
     then:
       - lambda: |-
+          const float timeout = id(progress_player_state).state == "playing" ? id(display_timeout_playing).state : id(display_timeout_idle).state;
           if (id(lcd_backlight).state && !id(display_touch_active) &&
-              uint32_t(millis() - id(display_activity_ms)) >= 60000UL) {
+              timeout > 0 &&
+              uint32_t(millis() - id(display_activity_ms)) >= uint32_t(timeout * 1000)) {
             id(lcd_backlight).turn_off();
-            ESP_LOGI("display_idle", "Backlight off after 60s inactivity");
+            ESP_LOGI("display_idle", "Backlight off after %.0fs inactivity", timeout);
           }
 
 motion:
@@ -260,6 +262,9 @@ text_sensor:
     id: progress_player_state
     update_interval: never
     internal: true
+    on_value:
+      then:
+        - script.execute: wake_display
   - platform: template
     id: progress_player_source
     update_interval: never
@@ -761,3 +766,35 @@ touchscreen:
                   reader_id: ${reader_id}
                   command: seek
                   seek_position: !lambda return to_string(id(seek_target_seconds));
+
+number:
+  - platform: template
+    id: display_timeout_playing
+    name: Display Timeout Playing
+    entity_category: config
+    unit_of_measurement: s
+    min_value: 0
+    max_value: 1800
+    step: 10
+    initial_value: 60
+    restore_value: true
+    optimistic: true
+    mode: box
+    on_value:
+      then:
+        - script.execute: wake_display
+  - platform: template
+    id: display_timeout_idle
+    name: Display Timeout Idle
+    entity_category: config
+    unit_of_measurement: s
+    min_value: 0
+    max_value: 1800
+    step: 10
+    initial_value: 60
+    restore_value: true
+    optimistic: true
+    mode: box
+    on_value:
+      then:
+        - script.execute: wake_display

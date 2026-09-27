@@ -18,9 +18,11 @@ printing instructions before printing it.**
 - Mark audiobooks: shuffle is actively turned off and verified before playback.
 - Touchscreen with title, artist, cover, progress, play/pause, previous/next and seeking.
 - Native Home Assistant dashboard: **Enroll | Saved cards | Configuration**.
-- Firmware includes a 60-second backlight timeout and wake by touch, movement or
-  a new card scan. The wake gesture does not trigger playback controls. This
-  addition has compiled successfully; physical verification is pending.
+- Configure separate display timeouts for playback and pause/stop per reader
+  in the Configuration tab (0 = always on; default 60 seconds each). Settings
+  persist on the device. Wake by movement or a new card; the 2-inch board also
+  supports touch wake without triggering playback controls. The office RGB LED
+  cycles through rainbow colors during playback.
 
 **Music Assistant is not required.** Playback uses Home Assistant's native Spotify
 integration and Spotify Connect. A computer is needed for setup, not daily operation.
