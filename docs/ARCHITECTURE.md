@@ -98,3 +98,16 @@ addition has compiled successfully but still needs physical testing.
 checks. rB's physical test exposed weak supports and catches. rC introduces broad
 supports, replaceable display clamp strips and four removable locking keys; it is
 geometrically checked but has not been printed or mechanically tested.
+
+## Audiobook persistence
+
+`nfc_audiobook` is a YAML custom integration. The play-card script calls its
+`prepare` action after validating the reader, enrollment lease and card URI. Music
+continues through the existing script; audiobooks are handled by the component.
+`choose` consumes a request ID so stale display taps cannot start a newer card.
+The server stores bookmarks and active tracking in HA Store (`nfc_audiobook`,
+version 1). Pending dialogs are transient. Keys include listener/account, card UID
+and context URI; remapping a card cannot reuse the previous content bookmark.
+Spotify context/source and MA queue-item IDs guard against unrelated playback
+overwriting a bookmark. HA state `sensor.nfc_audiobook` exposes pending dialogs,
+active card names and errors; firmware subscribes to `displays_json`.

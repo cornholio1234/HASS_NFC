@@ -101,7 +101,7 @@ console.log('PASS: scans and enrollment leases are isolated by selected reader.'
   for(const backend of ['spotify','music_assistant']) for(const [status,uid] of [['connection','last_card_uid'],['verbindung','letzte_karten_uid']]){
     let profiles={variables:{profiles:{}}};
     const fields={'profile-backend':backend,'profile-device':'reader-1','profile-player':'media_player.spotify_test',
-      'profile-source':'Office','profile-name':'Desk','profile-kind':'audiobook','profile-shuffle':'keep'};
+      'profile-resume':'ask','profile-library':'Listener 1','profile-source':'Office','profile-name':'Desk','profile-kind':'audiobook','profile-shuffle':'keep'};
     const pairing={busy:false,active:false,profiles:{},profileBase:structuredClone(profiles),
       shadowRoot:{querySelector:id=>({value:fields[id.slice(1)]})},
       entities:[{entity_id:'media_player.spotify_test',platform:backend},{device_id:'reader-1',entity_id:`binary_sensor.panel_${status}`},
@@ -113,6 +113,8 @@ console.log('PASS: scans and enrollment leases are isolated by selected reader.'
     await ctx.test.NfcCardEnroller.prototype.saveProfile.call(pairing);
     assert.equal(profiles.variables.profiles['reader-1'].status_entity,`binary_sensor.panel_${status}`);
     assert.equal(profiles.variables.profiles['reader-1'].last_uid_entity,`sensor.panel_${uid}`);
+    assert.equal(profiles.variables.profiles['reader-1'].resume_mode,'ask');
+    assert.equal(profiles.variables.profiles['reader-1'].bookmark_library,'Listener 1');
     assert.equal(profiles.variables.profiles['reader-1'].default_kind,'audiobook');
     assert.equal(profiles.variables.profiles['reader-1'].backend,backend);
     assert.equal(profiles.variables.profiles['reader-1'].source,backend==='spotify'?'Office':'');

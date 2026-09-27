@@ -116,6 +116,11 @@ entity. This backend does not need a native Spotify entity for the reader.
 
 ### 2. Copy the Home Assistant files
 
+Copy [custom_components/nfc_audiobook](home_assistant/custom_components/nfc_audiobook)
+to `/config/custom_components/nfc_audiobook`. Restart Home Assistant after copying
+this component and the package below. It provides persistent audiobook bookmarks.
+
+
 1. Enable [packages](https://www.home-assistant.io/docs/configuration/packages/)
    if needed. Add the following beneath the existing `homeassistant:` section in
    `configuration.yaml`; **do not create a second section**:
@@ -226,6 +231,37 @@ works in the same browser. The physical card is neither written nor erased.
 **Inspect cards**, in the **Enroll** tab, shows IDs and titles without starting
 playback. Saved cards has no duplicate reader selector or inspection controls.
 
+## Audiobook bookmarks
+
+Audiobook cards save their chapter and position on the Home Assistant server.
+On the 2-inch display, choose **Restart** or **Continue** when a bookmark exists.
+A new book starts immediately. For the 1.47B-M without touch controls, use automatic
+continuation; **Restart** is available in the dashboard's Enroll tab for its active book.
+
+In each reader's Configuration, set **Audiobook resume** to **Ask on touchscreen**
+or **Continue automatically**. The touchscreen option needs the updated 2-inch
+firmware. Pending choices expire after two minutes; scanning another card replaces them.
+
+Bookmarks are scoped to the card, content URI and Spotify account. Music Assistant
+uses its integration's default playback user. To share progress across backends or
+separate listeners using one account, enter the same/different **Bookmark library**
+name in the respective reader profiles. This label groups bookmarks; it does not
+change the account used for playback.
+
+The component samples playback every five seconds and saves before card changes
+and at HA shutdown. Data survives restart in `/config/.storage/nfc_audiobook`;
+include it in backups. Playback feedback latency can affect the last saved seconds.
+Spotify resumes within the original album/playlist using its chapter offset; Music
+Assistant rebuilds the original context using `start_item` and then seeks. Both
+keep the fixed target speaker and disable shuffle. Failed playback retains the
+previous bookmark. Music cards retain their existing behavior.
+
+Updating an existing installation requires the custom component, HA package,
+play-card script (preserve `variables.card_map`), dashboard JS and touchscreen
+firmware. The first-install helper does not replace existing scripts. Restart HA
+after installing/updating the component. These adapters use the installed Spotify
+and Music Assistant integration clients; a future HA update may require adaptation.
+
 ## 3D enclosure rC
 
 ![Enclosure rC](enclosure/rC/preview.png)
@@ -254,7 +290,6 @@ older parts are not compatible.
   between position updates.
 - Separate playback and pause/stop timeouts are deployed on both boards. Physical
   motion-wake sensitivity remains provisional: 0.18 g deviation from a moving baseline.
-- No automatic audiobook resume across card changes.
 - Missing speakers: check the account and Spotify Connect availability first.
 - No scans: check power, SPI wiring and ESPHome logs, then the device ID and reader
   profile. Arbitrary 125 kHz tags are not supported.

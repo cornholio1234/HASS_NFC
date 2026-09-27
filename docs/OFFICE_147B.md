@@ -78,6 +78,13 @@ NFC, Wi-Fi and playback continue. Nudge the device or scan a card to wake it. Th
 board has no touch sensor, so touching stationary glass alone cannot wake it.
 The provisional motion threshold is a 0.18 g change from a moving baseline.
 
+## Audiobook continuation
+
+Set **Audiobook resume → Continue automatically** in this reader profile. Saved
+chapters resume automatically; restart the active audiobook from the dashboard
+Enroll tab. This board has no touchscreen choice buttons. Bookmarks live in Home
+Assistant, so no additional office firmware update is needed for this feature.
+
 ## Flat enclosure
 
 [CAD, STLs and assembly instructions](../enclosure/office-147b/r0/README.md).

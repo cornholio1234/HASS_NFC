@@ -37,6 +37,24 @@
       "value_template": "{{ media_uri is string and media_uri | regex_match('^spotify:(playlist|album|track):[A-Za-z0-9]{22}$') }}"
     },
     {
+      "action": "nfc_audiobook.prepare",
+      "data": {
+        "reader_id": "{{ reader_id }}",
+        "tag_id": "{{ tag_id }}",
+        "card": "{{ card }}",
+        "profile": "{{ profile }}"
+      },
+      "response_variable": "audiobook_result"
+    },
+    {
+      "if": "{{ audiobook_result.handled }}",
+      "then": [
+        {
+          "stop": "Audiobook handled by bookmark service"
+        }
+      ]
+    },
+    {
       "choose": [
         {
           "conditions": "{{ backend == 'spotify' }}",

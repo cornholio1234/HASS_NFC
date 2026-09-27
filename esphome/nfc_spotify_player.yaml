@@ -149,6 +149,21 @@ motion:
     update_interval: 50ms
 
 globals:
+  - id: book_request
+    type: std::string
+    initial_value: '""'
+  - id: book_title
+    type: std::string
+    initial_value: '""'
+  - id: book_chapter
+    type: std::string
+    initial_value: '""'
+  - id: book_position
+    type: float
+    initial_value: '0'
+  - id: book_busy
+    type: bool
+    initial_value: 'false'
   - id: display_activity_ms
     type: uint32_t
     restore_value: false
@@ -228,6 +243,27 @@ sensor:
     internal: true
 
 text_sensor:
+  - platform: homeassistant
+    id: audiobook_dialog
+    entity_id: sensor.nfc_audiobook
+    attribute: displays_json
+    internal: true
+    on_value:
+      - lambda: |-
+          if (x.rfind("BOOK:", 0) != 0) return;
+          json::parse_json(x.substr(5), [](JsonObject root) -> bool {
+            JsonObject data = root["${reader_id}"].as<JsonObject>();
+            std::string request = data["request_id"] | "";
+            if (request != id(book_request)) {
+              id(book_request) = request;
+              id(book_busy) = false;
+              if (!request.empty()) id(wake_display).execute();
+            }
+            id(book_title) = data["title"] | "";
+            id(book_chapter) = data["track_title"] | "";
+            id(book_position) = data["position"] | 0.0f;
+            return true;
+          });
   - platform: homeassistant
     id: reader_runtime
     entity_id: sensor.nfc_jukebox_runtime
@@ -359,7 +395,7 @@ binary_sensor:
     on_press:
       - if:
           condition:
-            lambda: return !id(wake_touch_only) && id(lcd_backlight).state && id(api_status).state && id(progress_player_source).state == "matched";
+            lambda: return id(book_request).empty() && !id(wake_touch_only) && id(lcd_backlight).state && id(api_status).state && id(progress_player_source).state == "matched";
           then:
           - lambda: |-
               id(pending_button) = 1;
@@ -384,7 +420,7 @@ binary_sensor:
     on_press:
       - if:
           condition:
-            lambda: return !id(wake_touch_only) && id(lcd_backlight).state && id(api_status).state && id(progress_player_source).state == "matched";
+            lambda: return id(book_request).empty() && !id(wake_touch_only) && id(lcd_backlight).state && id(api_status).state && id(progress_player_source).state == "matched";
           then:
           - lambda: |-
               id(pending_button) = 2;
@@ -409,7 +445,7 @@ binary_sensor:
     on_press:
       - if:
           condition:
-            lambda: return !id(wake_touch_only) && id(lcd_backlight).state && id(api_status).state && id(progress_player_source).state == "matched";
+            lambda: return id(book_request).empty() && !id(wake_touch_only) && id(lcd_backlight).state && id(api_status).state && id(progress_player_source).state == "matched";
           then:
           - lambda: |-
               id(pending_button) = 3;
@@ -518,6 +554,19 @@ display:
       it.fill(id(background));
       const int width = it.get_width();
       const int height = it.get_height();
+      if (!id(book_request).empty()) {
+        it.print(12, 12, id(font_medium), id(accent), "Continue audiobook?");
+        it.printf(12, 48, id(font_body), id(primary_text), "%.34s", id(book_title).c_str());
+        it.printf(12, 79, id(font_small), id(secondary_text), "%.42s", id(book_chapter).c_str());
+        const int seconds = (int) id(book_position);
+        it.printf(12, 108, id(font_medium), id(primary_text), "%d:%02d", seconds / 60, seconds % 60);
+        it.filled_rectangle(10, 160, 145, 70, id(surface));
+        it.filled_rectangle(165, 160, 145, 70, id(accent));
+        it.print(82, 195, id(font_body), id(primary_text), TextAlign::CENTER, "Restart");
+        it.print(237, 195, id(font_body), id(background), TextAlign::CENTER, "Continue");
+        if (id(book_busy)) it.print(160, 140, id(font_small), id(secondary_text), TextAlign::CENTER, "Loading ...");
+        return;
+      }
       const bool playing = id(player_state).state == "playing";
       const bool paused = id(player_state).state == "paused";
       const bool connected = id(api_status).state;
@@ -737,8 +786,20 @@ touchscreen:
                    touch.x, touch.y, touch.x_raw, touch.y_raw);
       - if:
           condition:
+            lambda: return !id(book_request).empty() && !id(book_busy) && !id(wake_touch_only) && touch.y >= 160 && touch.y <= 230 && touch.x >= 10 && touch.x <= 310;
+          then:
+            - homeassistant.action:
+                action: nfc_audiobook.choose
+                data:
+                  reader_id: ${reader_id}
+                  request_id: !lambda return id(book_request);
+                  choice: !lambda |-
+                    return touch.x < 160 ? std::string("restart") : std::string("continue");
+            - lambda: id(book_busy) = true;
+      - if:
+          condition:
             lambda: |-
-              return !id(wake_touch_only) && touch.y <= 43 && touch.x >= 12 && touch.x <= 307 &&
+              return id(book_request).empty() && !id(wake_touch_only) && touch.y <= 43 && touch.x >= 12 && touch.x <= 307 &&
                      id(api_status).state &&
                      id(progress_player_source).state == "matched" &&
                      (id(progress_player_state).state == "playing" ||

@@ -1,3 +1,5 @@
+nfc_audiobook: {}
+
 template:
 - triggers:
   - trigger: event

@@ -1,0 +1,21 @@
+prepare:
+  name: Prepare scanned card
+  description: Save the previous audiobook and handle resume or a touchscreen choice. Called by the play-card script.
+choose:
+  name: Choose audiobook playback
+  description: Restart or continue the waiting audiobook; restart an active book without a touchscreen.
+  fields:
+    reader_id:
+      required: true
+      selector:
+        text:
+    choice:
+      required: true
+      selector:
+        select:
+          options:
+            - restart
+            - continue
+    request_id:
+      selector:
+        text:
