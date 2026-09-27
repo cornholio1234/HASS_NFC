@@ -312,7 +312,7 @@ class NfcCardEnroller extends HTMLElement {
       if(JSON.stringify(verified.variables.profiles)!==JSON.stringify(updated.variables.profiles))throw Error('Save not confirmed.');
       await this._hass.callService('script',PROFILE_SCRIPT,{});
       this.profileBase=verified;this.profiles=verified.variables.profiles;this.readerId=this.readerId||id;this.buildProfiles();this.loadProfile(id);
-      this.profileMessage='Pairing saved and activated.';
+      this.profileMessage='Pairing saved. See the setup steps below.';this.shadowRoot.querySelector('#reader-setup').open=true;
     }catch(e){this.profileMessage=e.message||'Could not save the pairing.';}
     finally{this.busy=false;this.render();}
   }
@@ -361,7 +361,7 @@ class NfcCardEnroller extends HTMLElement {
       <label for="profile-kind">Default for new cards</label><select id="profile-kind"><option value="music">Music</option><option value="audiobook">Audiobook</option></select>
       <label for="profile-shuffle">Shuffle for music</label><select id="profile-shuffle"><option value="keep">Keep current setting</option><option value="on">On</option><option value="off">Off</option></select>
       <small>Audiobooks always turn shuffle off. Readers without displays can be paired directly; additional displays need the reader-aware firmware installed once.</small>
-      <div class="buttons"><button id="save-profile" class="primary">Save pairing</button></div><div id="profile-message" role="status"></div>
+      <div class="buttons"><button id="save-profile" class="primary">Save pairing</button></div><div id="profile-message" role="status"></div><details id="reader-setup" class="focus" hidden><summary>Finish setting up this reader</summary><p>Pairing saved. This does not confirm that the display is configured. If it already shows the correct playback state, no firmware update is needed.</p><ol><li>If the display says “Set up this reader”: open this device in ESPHome → Edit. Under substitutions, replace the existing reader_id line with:<pre><code id="reader-setup-id"></code></pre></li><li>Save → Install → Wirelessly. This is needed once per new display, or if its HA device ID changes. Changing the Spotify account or speaker needs no flash.</li><li>In the device’s ESPHome integration options, allow Home Assistant actions. Then scan a saved card and verify the selected speaker and display. Readers without a display do not need the display-ID step.</li></ol></details>
       </section>
     </ha-card>`;
     this.buildProfiles();
@@ -394,6 +394,7 @@ class NfcCardEnroller extends HTMLElement {
     el('saved-last-card').innerHTML=this.checking&&this.active?el('last-card').innerHTML:'';
     const selectedTab=this.tab||'learn';el('panel-learn').hidden=selectedTab!=='learn';el('panel-saved').hidden=selectedTab!=='saved';el('panel-config').hidden=selectedTab!=='config';
     el('active-reader').disabled=this.active||this.busy;el('profile-message').textContent=this.profileMessage||'';
+    el('reader-setup').hidden=!this.editProfileId||!this.profiles[this.editProfileId];el('reader-setup-id').textContent=`reader_id: ${this.editProfileId||''}`;
     el('save-profile').disabled=this.active||this.busy;
     for(const field of ['profile-reader','profile-device','profile-name','profile-player','profile-source','profile-kind','profile-shuffle','new-profile'])el(field).disabled=this.active||this.busy||(field==='profile-device'&&!!this.editProfileId);
     for(const b of this.shadowRoot.querySelectorAll('[data-tab]'))b.setAttribute('aria-selected',String(b.dataset.tab===(this.tab||'learn')));
