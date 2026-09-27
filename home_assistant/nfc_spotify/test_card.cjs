@@ -2,6 +2,16 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const ctx={URL,HTMLElement:class{},customElements:{get:()=>false,define:()=>{}},window:{},structuredClone,localStorage:{setItem(){}}};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/nfc-card-enroller.js','utf8')+'\nglobalThis.test={parseBatch,assign,escapeHtml,resolveNames,NfcCardEnroller,DEVICE,visibleCards};',ctx);
 const {parseBatch,assign,escapeHtml}=ctx.test;
+for(const type of ['album','playlist','track']){
+  for(const provider of ['spotify','spotify--kAzBfto7']){
+    const row=parseBatch(`Custom | ${provider}://${type}/6Lr6waPB6WbWYc0dZddF1s`)[0];
+    assert.equal(row.uri,`spotify:${type}:6Lr6waPB6WbWYc0dZddF1s`);assert.equal(row.name,'Custom');
+  }
+}
+assert.equal(parseBatch('spotify--kAzBfto7://album/6Lr6waPB6WbWYc0dZddF1s')[0].manualName,false);
+for(const bad of ['library://album/42','spotify--test://artist/6Lr6waPB6WbWYc0dZddF1s','spotify--test://album/short','spotify--test://album/6Lr6waPB6WbWYc0dZddF1s/extras'])assert.throws(()=>parseBatch(bad));
+console.log('PASS: Music Assistant Spotify URIs normalize; invalid IDs, artists and library URIs rejected.');
+
 const rows=parseBatch('Test | https://open.spotify.com/intl-de/album/6xTRKdIeqh0L83hQolUrYT?highlight=spotify:track:4svEQNlfJhLDDX8ZNPByW8\nMix | spotify:playlist:37i9dQZF1E4weo7Nn3vlcB');
 assert.equal(rows[0].uri,'spotify:album:6xTRKdIeqh0L83hQolUrYT');assert.equal(rows[0].name,'Test');
 assert.throws(()=>parseBatch('https://open.spotify.com/playlist/invalid'));

@@ -19,9 +19,11 @@ const visibleCards = (map,query='',sort='title') => {
 };
 const parseBatch = text => {
   const rows = text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean).map((line,i)=>{
-    const m = line.match(/https:\/\/open\.spotify\.com\/[^\s]+|spotify:(?:playlist|album|track):[A-Za-z0-9]+/);
+    const m = line.match(/https:\/\/open\.spotify\.com\/[^\s]+|spotify(?:--[A-Za-z0-9_-]+)?:\/\/[^\s]+|spotify:(?:playlist|album|track):[A-Za-z0-9]+/);
     if (!m) throw Error(`Line ${i+1}: Missing Spotify link.`);
     let uri=m[0].replace(/[)>\]]+$/,'');
+    const ma=uri.match(/^spotify(?:--[A-Za-z0-9_-]+)?:\/\/(playlist|album|track)\/([A-Za-z0-9]{22})\/?$/);
+    if(ma)uri=`spotify:${ma[1]}:${ma[2]}`;
     if (uri.startsWith('https:')) {
       const url=new URL(uri), p=url.pathname.match(/^\/(?:intl-[a-zA-Z-]+\/)?(playlist|album|track)\/([A-Za-z0-9]{22})\/?$/);
       if(url.hostname!=='open.spotify.com'||!p) throw Error(`Line ${i+1}: Use a direct playlist, album or track link.`);
