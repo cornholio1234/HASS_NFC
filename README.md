@@ -27,7 +27,15 @@ integration and Spotify Connect. A computer is needed for setup, not daily opera
 
 ## Hardware and requirements
 
-The included firmware targets this hardware:
+Two firmware variants are available:
+
+- **2-inch touch jukebox:** the hardware and wiring below.
+- **1.47B-M office reader, without controls:** [pinout, firmware and setup](docs/OFFICE_147B.md),
+  plus a [70 × 50 × 40 mm screwless enclosure](enclosure/office-147b/r0/README.md).
+  The office firmware has compiled; board testing and physical enclosure fit are pending.
+  Its display wakes on movement or a new card scan, not stationary touch.
+
+The original touch firmware targets this hardware:
 
 | Component | Model used |
 |---|---|
@@ -46,7 +54,8 @@ independent simultaneous playback.
 
 ## Wiring
 
-These pins apply to the Waveshare board listed above:
+These pins apply to the **2-inch Touch-LCD-2 only**. For the 1.47B-M, use the
+[office pinout](docs/OFFICE_147B.md#rc522-wiring).
 
 | RC522 | ESP32 GPIO / connector | Wire color in the original build |
 |---|---|---|

@@ -1,0 +1,438 @@
+substitutions:
+  device_name: nfc-office-147b
+  friendly_name: NFC Office Display
+  # Stable hardware identity; player and speaker are configured in HA.
+  reader_id: REPLACE_WITH_HOME_ASSISTANT_DEVICE_ID
+  home_assistant_url: http://homeassistant.local:8123
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.9.0
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: wake_display
+      - lambda: |-
+          // Compare the acceleration vector with a slowly following baseline.
+          // Units are g; gravity/orientation alone must not keep the screen on.
+          id(panel_motion).add_listener([](auto &data) {
+            static bool initialized = false;
+            static float baseline[3] = {};
+            float delta_squared = 0;
+            for (int i = 0; i < 3; i++)
+              if (!std::isfinite(data.acceleration[i])) return;
+            for (int i = 0; i < 3; i++) {
+              const float value = data.acceleration[i];
+              if (!initialized) baseline[i] = value;
+              const float delta = value - baseline[i];
+              delta_squared += delta * delta;
+              baseline[i] += 0.15f * delta;
+            }
+            if (initialized && delta_squared > 0.18f * 0.18f) {
+              if (!id(lcd_backlight).state) ESP_LOGI("display_idle", "Wake: motion");
+              id(wake_display).execute();
+            }
+            initialized = true;
+          });
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+
+json:
+
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Setup"
+
+captive_portal:
+
+http_request:
+  timeout: 10s
+  verify_ssl: false
+
+# Waveshare ESP32-S3-LCD-1.47B-M: onboard QMI8658, no touch controller.
+i2c:
+  id: imu_i2c
+  sda: GPIO48
+  scl: GPIO47
+  frequency: 400kHz
+
+# Dedicated SPI buses. Header GPIO7..11 are free on the B variant.
+spi:
+  - id: lcd_spi
+    clk_pin: GPIO40
+    mosi_pin: GPIO45
+  - id: rfid_spi
+    clk_pin: GPIO7
+    mosi_pin: GPIO8
+    miso_pin: GPIO9
+
+rc522_spi:
+  id: rfid_reader
+  # Conservative 1 MHz starting point; verify with the actual wiring.
+  data_rate: 1MHz
+  spi_id: rfid_spi
+  cs_pin: GPIO11
+  reset_pin: GPIO10
+  update_interval: 1s
+  on_tag:
+    then:
+      - lambda: |-
+          id(last_tag).publish_state(x);
+          id(last_scan_ms) = millis();
+          id(wake_display).execute();
+      - homeassistant.tag_scanned: !lambda return x;
+
+# Backlight sleep only: Wi-Fi, NFC and playback remain available. Wake by motion or a new scan.
+script:
+  - id: wake_display
+    mode: restart
+    then:
+      - lambda: |-
+          id(display_activity_ms) = millis();
+          if (!id(lcd_backlight).state) {
+            id(lcd_backlight).turn_on();
+          }
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (id(lcd_backlight).state &&
+              uint32_t(millis() - id(display_activity_ms)) >= 60000UL) {
+            id(lcd_backlight).turn_off();
+            ESP_LOGI("display_idle", "Backlight off after 60s inactivity");
+          }
+
+motion:
+  - platform: qmi8658
+    id: panel_motion
+    i2c_id: imu_i2c
+    address: 0x6B
+    accelerometer_range: 4G
+    accelerometer_odr: 125HZ
+    gyroscope_odr: 125HZ
+    update_interval: 50ms
+
+globals:
+  - id: display_activity_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  - id: reader_configured
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: cover_ready
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: last_media_active_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  - id: last_scan_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: "0"
+  - id: position_epoch
+    type: int64_t
+    restore_value: false
+    initial_value: "0"
+
+time:
+  - platform: homeassistant
+    id: ha_clock
+
+sensor:
+  - platform: template
+    id: track_position
+    update_interval: never
+    internal: true
+  - platform: template
+    id: track_duration
+    update_interval: never
+    internal: true
+
+text_sensor:
+  - platform: homeassistant
+    id: reader_runtime
+    entity_id: sensor.nfc_jukebox_runtime
+    attribute: readers_json
+    internal: true
+    on_value:
+      - lambda: |-
+          if (x.rfind("NFC:", 0) != 0) return;
+          json::parse_json(x.substr(4), [](JsonObject root) -> bool {
+            JsonObject data = root["${reader_id}"].as<JsonObject>();
+            id(reader_configured) = !data.isNull();
+            const bool matched = !data.isNull() && (data["matched"] | false);
+            auto publish_text = [](text_sensor::TextSensor *sensor, const std::string &value) {
+              if (!sensor->has_state() || sensor->state != value) sensor->publish_state(value);
+            };
+            // Identity/state first, then position and cover, preserving the existing callbacks.
+            publish_text(id(progress_player_source), matched ? "matched" : "");
+            publish_text(id(progress_player_state), matched ? (data["state"] | "idle") : "idle");
+            publish_text(id(player_state), matched ? (data["state"] | "idle") : "idle");
+            publish_text(id(media_identity), matched ? (data["media_content_id"] | "") : "");
+            publish_text(id(media_title), matched ? (data["media_title"] | "") : "");
+            publish_text(id(media_artist), matched ? (data["media_artist"] | "") : "");
+            const float duration = matched ? (data["media_duration"] | 0.0f) : 0.0f;
+            const float position = matched ? (data["media_position"] | 0.0f) : 0.0f;
+            if (!id(track_duration).has_state() || id(track_duration).state != duration) id(track_duration).publish_state(duration);
+            if (!id(track_position).has_state() || id(track_position).state != position) id(track_position).publish_state(position);
+            publish_text(id(position_updated_at), matched ? (data["media_position_updated_at"] | "") : "");
+            publish_text(id(media_cover_url), matched ? (data["entity_picture"] | "") : "");
+            return true;
+          });
+
+  - platform: template
+    id: progress_player_state
+    update_interval: never
+    internal: true
+  - platform: template
+    id: progress_player_source
+    update_interval: never
+    internal: true
+  - platform: template
+    id: position_updated_at
+    update_interval: never
+    internal: true
+    on_value:
+      - lambda: |-
+          int year, month, day, hour, minute, second;
+          id(position_epoch) = 0;
+          if (sscanf(x.c_str(), "%d-%d-%d%*c%d:%d:%d",
+                     &year, &month, &day, &hour, &minute, &second) != 6) return;
+          ESPTime parsed = {};
+          parsed.year = year;
+          parsed.month = month;
+          parsed.day_of_month = day;
+          parsed.hour = hour;
+          parsed.minute = minute;
+          parsed.second = second;
+          int offset = 0;
+          const auto zone = x.find_first_of("+-", 19);
+          if (zone != std::string::npos) {
+            int zh = 0, zm = 0;
+            if (sscanf(x.c_str() + zone + 1, "%d:%d", &zh, &zm) == 2)
+              offset = (zh * 3600 + zm * 60) * (x[zone] == '-' ? -1 : 1);
+          }
+          parsed.recalc_timestamp_utc(false);
+          id(position_epoch) = static_cast<int64_t>(parsed.timestamp) - offset;
+
+  - platform: template
+    id: last_tag
+    name: "Last card UID"
+    icon: mdi:card-account-details-outline
+    update_interval: never
+
+  - platform: template
+    id: player_state
+    update_interval: never
+    internal: true
+
+  - platform: template
+    id: media_title
+    update_interval: never
+    internal: true
+
+  - platform: template
+    id: media_identity
+    update_interval: never
+    internal: true
+
+  - platform: template
+    id: media_artist
+    update_interval: never
+    internal: true
+
+  - platform: template
+    id: media_cover_url
+    update_interval: never
+    internal: true
+    on_value:
+      then:
+        - lambda: id(cover_ready) = false;
+        - component.update: lcd
+        - if:
+            condition:
+              lambda: |-
+                return x.rfind("http://", 0) == 0 ||
+                       x.rfind("https://", 0) == 0 ||
+                       x.rfind("/api/media_player_proxy/", 0) == 0;
+            then:
+              - online_image.set_url:
+                  id: media_cover
+                  url: !lambda |-
+                    return x.rfind("/api/media_player_proxy/", 0) == 0
+                        ? std::string("${home_assistant_url}") + x : x;
+
+binary_sensor:
+  - platform: status
+    id: api_status
+    name: "Connection"
+
+switch:
+  - platform: gpio
+    id: lcd_backlight
+    pin: GPIO46
+    restore_mode: ALWAYS_ON
+    internal: true
+
+font:
+  - file: "gfonts://Roboto"
+    id: font_small
+    size: 11
+    glyphsets: [GF_Latin_Kernel, GF_Latin_Core]
+  - file: "gfonts://Roboto"
+    id: font_body
+    size: 14
+    glyphsets: [GF_Latin_Kernel, GF_Latin_Core]
+  - file: "gfonts://Roboto@700"
+    id: font_title
+    size: 19
+    glyphsets: [GF_Latin_Kernel, GF_Latin_Core]
+
+color:
+  - id: background
+    hex: "0B0F14"
+  - id: surface
+    hex: "151B23"
+  - id: surface_alt
+    hex: "202A35"
+  - id: accent
+    hex: "14B8C4"
+  - id: accent_pressed
+    hex: "46D6DF"
+  - id: primary_text
+    hex: "F7F9FC"
+  - id: secondary_text
+    hex: "94A3B8"
+  - id: warning_text
+    hex: "F59E0B"
+  - id: button_fill
+    hex: "24303D"
+  - id: divider
+    hex: "2B3642"
+
+image:
+  - platform: online_image
+    id: media_cover
+    url: "http://127.0.0.1/cover.jpg"
+    format: JPEG
+    type: RGB565
+    byte_order: little_endian
+    resize: 104x104
+    update_interval: never
+    on_download_finished:
+      - lambda: id(cover_ready) = true;
+      - component.update: lcd
+    on_error:
+      - lambda: id(cover_ready) = false;
+      - component.update: lcd
+      - logger.log: "Could not load album cover"
+
+display:
+  - platform: mipi_spi
+    id: lcd
+    model: ST7789V
+    spi_id: lcd_spi
+    cs_pin: GPIO42
+    dc_pin: GPIO41
+    reset_pin: GPIO39
+    # Manufacturer demo: 172x320 glass, X offset 34 in 240x320 RAM.
+    dimensions:
+      width: 172
+      height: 320
+      offset_width: 34
+      offset_height: 0
+    rotation: 90
+    color_order: BGR
+    invert_colors: true
+    data_rate: 10MHz
+    update_interval: 250ms
+    lambda: |-
+      if (!id(lcd_backlight).state) return;
+      it.fill(id(background));
+      const bool connected = id(api_status).state;
+      const bool playing = id(player_state).state == "playing";
+      const bool paused = id(player_state).state == "paused";
+      const bool buffering = id(player_state).state == "buffering";
+      if (playing || paused || buffering) id(last_media_active_ms) = millis();
+      const bool active = playing || paused || buffering ||
+          (id(last_media_active_ms) && uint32_t(millis()-id(last_media_active_ms)) < 5000);
+      const bool scanned = id(last_scan_ms) && uint32_t(millis()-id(last_scan_ms)) < 2500;
+      const bool matched = id(progress_player_source).state == "matched";
+      const auto valid = [](const std::string &v) {
+        return !v.empty() && v != "unknown" && v != "unavailable" && v != "None";
+      };
+
+      const char *status = !connected ? "HOME ASSISTANT OFFLINE" :
+          !id(reader_configured) ? "PAIR READER IN HOME ASSISTANT" :
+          scanned ? "CARD DETECTED" : playing ? "NOW PLAYING" :
+          paused ? "PAUSED" : active ? "LOADING" : "READY";
+      it.print(10, 9, id(font_small), connected ? id(accent) : id(warning_text), status);
+      it.filled_rectangle(8, 33, 108, 108, id(surface));
+      it.filled_circle(62, 87, 27, id(surface_alt));
+      it.filled_circle(62, 87, 8, id(accent));
+      if (id(cover_ready) && valid(id(media_title).state)) it.image(10, 35, id(media_cover));
+
+      std::string title = !connected ? "Connecting ..." : !id(reader_configured) ? "Set up this reader" :
+          scanned ? "Loading ..." : valid(id(media_title).state) ? id(media_title).state :
+          active ? "Loading ..." : "Scan a card";
+      std::string artist = !connected ? "Check Wi-Fi / HA" : !id(reader_configured) ? "Configuration tab" :
+          valid(id(media_artist).state) ? id(media_artist).state : active ? "" : "Music or audiobook";
+      auto marquee = [&](int y, const std::string &text, font::Font *font, Color color) {
+        int x1, y1, w, h;
+        it.get_text_bounds(126, y, text.c_str(), font, TextAlign::TOP_LEFT, &x1, &y1, &w, &h);
+        const int available = 184;
+        it.start_clipping(126, y, 309, y+h+2);
+        if (w <= available) it.print(126, y, font, color, text.c_str());
+        else {
+          const int shift = (millis()/45) % (w+36);
+          it.print(126-shift, y, font, color, text.c_str());
+          it.print(126-shift+w+36, y, font, color, text.c_str());
+        }
+        it.end_clipping();
+      };
+      marquee(46, title, id(font_title), id(primary_text));
+      marquee(84, artist, id(font_body), id(secondary_text));
+
+      // One metadata source; never count progress while paused or on another speaker.
+      const float duration = id(track_duration).state;
+      float position = id(track_position).state;
+      const auto now = id(ha_clock).now();
+      const bool known = matched && std::isfinite(duration) && duration>0 && std::isfinite(position);
+      if (known && playing && now.is_valid() && id(position_epoch)>0)
+        position += std::max<int64_t>(0, int64_t(now.timestamp)-id(position_epoch));
+      if (known) position = std::max(0.0f,std::min(position,duration));
+      it.filled_rectangle(10, 148, 300, 4, id(surface_alt));
+      if (known) {
+        it.filled_rectangle(10, 148, int(300*position/duration), 4, id(accent));
+        it.printf(10, 155, id(font_small), id(secondary_text), "%d:%02d", int(position)/60,int(position)%60);
+        it.printf(310, 155, id(font_small), id(secondary_text), TextAlign::TOP_RIGHT,
+                  "%d:%02d",int(duration)/60,int(duration)%60);
+      }
