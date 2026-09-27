@@ -12,6 +12,13 @@ const visibleCards = (map,query='',sort='title') => {
   const needle=query.trim().toLocaleLowerCase('en');
   return Object.entries(map||{}).filter(([uid,r])=>`${uid} ${r.name} ${kindLabel(r)}`.toLocaleLowerCase('en').includes(needle))
     .sort((a,b)=>{
+      if(sort==='newest'||sort==='oldest'){
+        const ad=Date.parse(a[1].assigned_at||''),bd=Date.parse(b[1].assigned_at||'');
+        const ak=Number.isFinite(ad),bk=Number.isFinite(bd);
+        if(ak!==bk)return ak?-1:1;
+        if(ak&&ad!==bd)return sort==='newest'?bd-ad:ad-bd;
+        return a[0].localeCompare(b[0]);
+      }
       const key=sort==='id'?0:1;
       const value=entry=>key===0?entry[0]:sort==='type'?kindLabel(entry[1]):entry[1].name;
       return String(value(a)).localeCompare(String(value(b)),'en',{numeric:true,sensitivity:'base'})||a[0].localeCompare(b[0]);
@@ -77,7 +84,7 @@ const assign = (rows,map,uid,replace=false)=>{
   const row=rows.find(r=>!r.uid);
   if(!row) return {message:'All cards scanned. Save the batch now.'};
   if(map[uid]&&!replace) return {candidate:uid,message:`Card ${uid} is saved as “${map[uid].name}”.`};
-  row.uid=uid;
+  row.uid=uid;row.assigned_at=new Date().toISOString();
   return {message:`Scanned: ${row.name} · Card ${uid}. Remove the card.`};
 };
 
@@ -246,7 +253,7 @@ class NfcCardEnroller extends HTMLElement {
         const current=await this.read();
         if(JSON.stringify(current)!==JSON.stringify(this.base))throw Error('The configuration has changed. End this session and start again to load the latest version.');
         const updated=structuredClone(current);
-        for(const row of this.rows)updated.variables.card_map[row.uid]={name:row.name,uri:row.uri,kind:kindOf(row)};
+        for(const row of this.rows)updated.variables.card_map[row.uid]={name:row.name,uri:row.uri,kind:kindOf(row),assigned_at:row.assigned_at||new Date().toISOString()};
         localStorage.setItem(DRAFT+'-last-backup',JSON.stringify(current));
         await this.lease(90);
         await this._hass.callApi('POST',`config/script/config/${SCRIPT}`,updated);
@@ -374,7 +381,7 @@ class NfcCardEnroller extends HTMLElement {
       <div id="conflict" hidden><div id="conflict-text"></div><button data-action="replace">Replace this card assignment</button></div>
       <div id="queue"></div><div class="buttons"><button data-action="save" class="primary">Save batch</button><button data-action="undo">Undo last assignment</button></div>
       </section><section id="panel-saved" role="tabpanel" aria-labelledby="tab-saved" hidden><div class="buttons"><button data-action="inspect">Inspect cards</button><button data-action="stop">Stop</button></div><div id="saved-message" role="status" aria-live="polite"></div><div id="saved-last-card"></div><h2 id="existing-title">Saved cards</h2><div id="title-editor" hidden><label for="edit-title">Edit title</label><input id="edit-title" maxlength="160"><div class="buttons"><button id="save-title" class="primary">Save</button><button id="cancel-title">Cancel</button></div></div>
-      <div class="card-tools"><input id="card-search" type="search" aria-label="Search cards" placeholder="Search ID, title or type …"><label for="card-sort">Sort:</label><select id="card-sort"><option value="title">Title A–Z</option><option value="id">Card ID</option><option value="type">Audiobook / Music</option></select><button id="restore-card" hidden>Undo deletion</button></div>
+      <div class="card-tools"><input id="card-search" type="search" aria-label="Search cards" placeholder="Search ID, title or type …"><label for="card-sort">Sort:</label><select id="card-sort"><option value="newest">Newest assignment first</option><option value="oldest">Oldest assignment first</option><option value="title" selected>Title A–Z</option><option value="id">Card ID</option><option value="type">Audiobook / Music</option></select><button id="restore-card" hidden>Undo deletion</button></div>
       <small id="card-results"></small><div class="table-scroll"><table><thead><tr><th>ID</th><th>Title</th><th>Type</th><th colspan="3">Actions</th></tr></thead><tbody id="existing"></tbody></table></div></section>
       <section id="panel-config" role="tabpanel" aria-labelledby="tab-config" hidden>
       <p>One pairing per reader. All readers share the card library. Independent simultaneous playback requires separate Spotify accounts.</p>
@@ -438,6 +445,7 @@ class NfcCardEnroller extends HTMLElement {
     const entries=Object.entries(this.map||{});el('existing-title').textContent=`${entries.length} saved cards`;
     const visible=visibleCards(this.map,this.search,this.sort),locked=this.busy||this.active&&!this.checking;
     el('card-results').textContent=`${visible.length} of ${entries.length} cards`;
+    if(['newest','oldest'].includes(this.sort))el('card-results').textContent+=' · Cards without a recorded date appear last.';
     el('restore-card').hidden=!this.deleted?.length;el('restore-card').disabled=locked;
     el('existing').innerHTML=visible.map(([uid,r])=>`<tr><td class="card-id">${escapeHtml(uid)}</td><td class="card-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${kindSelect(r,`data-saved-kind="${escapeHtml(uid)}" ${locked?'disabled':''}`)}</td><td><button class="icon-action" title="Edit title" aria-label="Edit title: ${escapeHtml(r.name)}" data-edit="${escapeHtml(uid)}" ${locked?'disabled':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m16 3 5 5-12 12H4v-5ZM14 5l5 5"/></svg></button></td><td><a class="icon-action" title="Open Spotify" aria-label="Open Spotify: ${escapeHtml(r.name)}" href="https://open.spotify.com/${escapeHtml(r.uri.split(':').slice(1).join('/'))}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 .1l3-3a5 5 0 0 0-7.1-7.1l-1.7 1.7M14 11a5 5 0 0 0-7-.1l-3 3a5 5 0 0 0 7.1 7.1l1.7-1.7"/></svg></a></td><td><button class="delete icon-action" title="Delete mapping" data-delete="${escapeHtml(uid)}" aria-label="Delete mapping: ${escapeHtml(r.name)} (${escapeHtml(uid)})" ${locked?'disabled':''}><span aria-hidden="true">×</span></button></td></tr>`).join('')||'<tr><td colspan="6">No matching cards.</td></tr>';
     for(const b of this.shadowRoot.querySelectorAll('[data-action]')){

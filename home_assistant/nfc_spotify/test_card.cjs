@@ -2,6 +2,16 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const ctx={URL,HTMLElement:class{},customElements:{get:()=>false,define:()=>{}},window:{},structuredClone,localStorage:{setItem(){}}};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/nfc-card-enroller.js','utf8')+'\nglobalThis.test={parseBatch,assign,escapeHtml,resolveNames,NfcCardEnroller,DEVICE,visibleCards};',ctx);
 const {parseBatch,assign,escapeHtml}=ctx.test;
+const dated={old:{name:'Old',assigned_at:'2026-01-01T10:00:00Z'},fresh:{name:'Fresh',assigned_at:'2026-02-01T10:00:00Z'},legacy:{name:'Legacy'},invalid:{name:'Invalid',assigned_at:'bad'}};
+assert.equal(ctx.test.visibleCards(dated,'','newest')[0][0],'fresh');
+assert.equal(ctx.test.visibleCards(dated,'','oldest')[0][0],'old');
+assert.equal(ctx.test.visibleCards(dated,'','oldest')[1][0],'fresh');
+assert.equal(ctx.test.visibleCards(dated,'Fresh','newest').length,1);
+const assigned=[{name:'New',uri:'spotify:album:6Lr6waPB6WbWYc0dZddF1s'}];
+assign(assigned,{},'AA-BB-CC-DD');assert.ok(Number.isFinite(Date.parse(assigned[0].assigned_at)));
+const stamp=assigned[0].assigned_at;assign(assigned,{},'AA-BB-CC-DD');assert.equal(assigned[0].assigned_at,stamp);
+console.log('PASS: assignment timestamps, chronological sorting, unknown dates last, duplicate scans preserve timestamp.');
+
 for(const type of ['album','playlist','track']){
   for(const provider of ['spotify','spotify--kAzBfto7']){
     const row=parseBatch(`Custom | ${provider}://${type}/6Lr6waPB6WbWYc0dZddF1s`)[0];
