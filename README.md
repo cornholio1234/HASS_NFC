@@ -252,8 +252,6 @@ older parts are not compatible.
   independent playback with two physical readers has not been verified.
 - Spotify/Home Assistant feedback has latency. Progress is extrapolated locally
   between position updates.
-- The local touch driver filters implausible raw values. It does not establish or
-  fix their electrical cause, and cannot reject every possible ghost touch.
 - Separate playback and pause/stop timeouts are deployed on both boards. Physical
   motion-wake sensitivity remains provisional: 0.18 g deviation from a moving baseline.
 - No automatic audiobook resume across card changes.
