@@ -127,7 +127,7 @@ interval:
           if (mode != previous_mode) {
             auto call = id(playback_led).make_call();
             call.set_state(mode != 0);
-            call.set_brightness(0.25f);
+            call.set_brightness(mode == 1 ? 1.0f : 0.25f);
             call.set_effect(mode == 1 ? "Playback Rainbow" : "None");
             if (mode == 2) call.set_rgb(1.0f, 0.0f, 0.0f);
             call.perform();
