@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import uuid
 
 SOURCE = Path(__file__).resolve().parents[1] / "home_assistant/custom_components/nfc_audiobook/__init__.py"
-namespace = dict(asyncio=NS(sleep=AsyncMock(), Lock=asyncio.Lock), deepcopy=deepcopy,
+namespace = dict(asyncio=NS(sleep=AsyncMock(), Lock=asyncio.Lock, timeout=asyncio.timeout), deepcopy=deepcopy,
     time=time, uuid=uuid, json=json, LOGGER=logging.getLogger(__name__),
     HomeAssistantError=RuntimeError, Store=lambda *a: NS(async_save=AsyncMock()), DOMAIN="nfc_audiobook",
     dt_util=NS(utcnow=lambda: datetime.now(timezone.utc), parse_datetime=datetime.fromisoformat))
@@ -45,6 +45,28 @@ class BookmarkTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(f(state),12)
         state.attributes["media_position"]=30
         self.assertEqual(f(state),19)
+
+    def test_opening_minute_is_book_position_not_chapter_position(self):
+        f=namespace['in_opening_minute']
+        tracks=[('one',40),('two',120),('three',90)]
+        self.assertTrue(f('one',39,tracks))
+        self.assertTrue(f('two',19.99,tracks))
+        self.assertFalse(f('two',20,tracks))
+        self.assertFalse(f('three',2,tracks))
+        self.assertFalse(f('unknown',2,tracks))
+        self.assertFalse(f('two',2,[('one',None),('two',120)]))
+
+    async def test_restart_rule_uses_spotify_album_order(self):
+        client=NS(get_album_tracks=AsyncMock(return_value=[NS(uri='first',duration_ms=120000),
+            NS(uri='second',duration_ms=120000)]))
+        self.manager.backend=lambda p:(NS(domain='spotify',runtime_data=NS(coordinator=NS(client=client))),None)
+        self.assertTrue(await self.manager.near_beginning(self.request,dict(position=59,track_uri='first')))
+        self.assertFalse(await self.manager.near_beginning(self.request,dict(position=60,track_uri='first')))
+        self.assertFalse(await self.manager.near_beginning(self.request,dict(position=5,track_uri='second')))
+
+    async def test_missing_track_list_keeps_resume_choice(self):
+        self.manager.backend=Mock(side_effect=RuntimeError('unavailable'))
+        self.assertFalse(await self.manager.near_beginning(self.request,dict(position=5,track_uri='first')))
 
     async def test_spotify_resume_keeps_album_context_and_explicit_speaker(self):
         client=NS(transfer_playback=AsyncMock(),set_shuffle=AsyncMock(),start_playback=AsyncMock())

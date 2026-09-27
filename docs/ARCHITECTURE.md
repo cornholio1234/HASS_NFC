@@ -108,3 +108,7 @@ and context URI; remapping a card cannot reuse the previous content bookmark.
 Spotify context/source and MA queue-item IDs guard against unrelated playback
 overwriting a bookmark. HA state `sensor.nfc_audiobook` exposes pending dialogs,
 active card names and errors; firmware subscribes to `displays_json`.
+
+Bookmarks within the first 60 seconds of the book restart without a choice.
+The threshold includes preceding chapter durations. If the track list cannot be
+resolved, the existing continuation behavior is retained.

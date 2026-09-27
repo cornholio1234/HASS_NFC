@@ -209,7 +209,8 @@ playback.
 
 Audiobook cards save their chapter and position on the Home Assistant server.
 On the 2-inch display, choose **Restart** or **Continue** when a bookmark exists.
-A new book starts immediately. For the 1.47B-M without touch controls, use automatic
+A new book or a bookmark within the first 60 seconds of the book restarts immediately.
+For the 1.47B-M without touch controls, use automatic
 continuation; **Restart** is available in the dashboard's Enroll tab for its active book.
 
 In each reader's Configuration, set **Audiobook resume** to **Ask on touchscreen**

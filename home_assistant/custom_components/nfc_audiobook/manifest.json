@@ -1,7 +1,7 @@
 {
   "domain": "nfc_audiobook",
   "name": "NFC Audiobook Bookmarks",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "documentation": "https://github.com/cornholio1234/HASS_NFC",
   "codeowners": ["@cornholio1234"],
   "dependencies": ["media_player"],

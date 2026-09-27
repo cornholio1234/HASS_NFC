@@ -28,6 +28,20 @@ def bookmark_key(library, tag, uri):
     return "|".join((library, tag.upper(), uri))
 
 
+def in_opening_minute(track_uri, position, tracks):
+    """Compare book position, including elapsed chapters, with the 60s threshold."""
+    offset = 0.0
+    for uri, duration in tracks:
+        if uri == track_uri:
+            return 0 <= offset + position < 60
+        if duration is None or duration <= 0:
+            return False
+        offset += duration
+        if offset >= 60:
+            return False
+    return False
+
+
 def position_seconds(state):
     position = float(state.attributes.get("media_position") or 0)
     stamp = state.attributes.get("media_position_updated_at")
@@ -152,12 +166,42 @@ class Bookmarks:
                            title=card["name"])
             mark = self.bookmarks.get(key, {})
             request.update(track_title=mark.get("track_title", ""), position=mark.get("position", 0))
-            if mark and profile.get("resume_mode", "auto") == "ask":
+            restart = not mark or await self.near_beginning(request, mark)
+            if not restart and profile.get("resume_mode", "auto") == "ask":
                 self.pending[rid] = request
                 self.publish()
             else:
-                await self.start(request, "continue" if mark else "restart")
+                await self.start(request, "restart" if restart else "continue")
             return {"handled": True}
+
+    async def near_beginning(self, request, mark):
+        position = float(mark.get("position", 0))
+        if position < 0 or position >= 60:
+            return False
+        uri = request["card"]["uri"]
+        if uri.startswith("spotify:track:"):
+            return True
+        try:
+            async with asyncio.timeout(10):
+                entry, _ = self.backend(request["profile"])
+                if entry.domain == "spotify":
+                    client = entry.runtime_data.coordinator.client
+                    if uri.startswith("spotify:album:"):
+                        items = await client.get_album_tracks(uri)
+                    else:
+                        items = [item.track for item in await client.get_playlist_items(uri)]
+                    tracks = [(item.uri, item.duration_ms / 1000) for item in items]
+                else:
+                    music = entry.runtime_data.mass.music
+                    item = await music.get_item_by_uri("https://open.spotify.com/" + "/".join(uri.split(":")[1:]))
+                    getter = music.get_album_tracks if uri.startswith("spotify:album:") else music.get_playlist_tracks
+                    items = await getter(item.item_id, item.provider)
+                    tracks = [(item.uri, item.duration) for item in items]
+            return in_opening_minute(mark["track_uri"], position, tracks)
+        except Exception:
+            # An unavailable track list must never turn a later chapter into a restart.
+            LOGGER.debug("Could not resolve audiobook opening position", exc_info=True)
+            return False
 
     async def choose(self, call):
         rid = call.data["reader_id"]
