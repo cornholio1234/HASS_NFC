@@ -197,7 +197,7 @@ class NfcCardEnroller extends HTMLElement {
     this.render();
   }
   async run(action){
-    if(this.busy)return;this.busy=true;this.render();
+    if(this.busy)return;this.actionError=null;this.busy=true;this.render();
     try{
       if(action==='inspect'){
         if(!this.readerOnline())throw Error('The NFC reader is disconnected.');
@@ -255,7 +255,7 @@ class NfcCardEnroller extends HTMLElement {
         try{await this.lease(-1);}catch{this.message='Saved. Enrollment mode will end within 90 seconds.';return;}
         this.message='Saved and activated. The cards can now start playback.';
       }
-    }catch(e){this.message=e.message||'Action failed. Your draft has been kept.';}
+    }catch(e){this.message=e.message||'Action failed. Your draft has been kept.';this.actionError={action,message:this.message};}
     finally{this.busy=false;this.render();}
   }
   buildProfiles(){
@@ -323,6 +323,7 @@ class NfcCardEnroller extends HTMLElement {
       ha-card{padding:24px}h1{font-size:26px;margin:0 0 6px}h2{font-size:18px;margin:24px 0 12px}
       p{line-height:1.5;margin:6px 0 16px;color:var(--secondary-text-color)}
       .status{font-size:14px;margin:16px 0}.focus{padding:18px;background:var(--secondary-background-color);border-radius:12px;margin:18px 0}
+      #enrollment-feedback.error{border:2px solid var(--error-color,#db4437);border-left-width:6px}#enrollment-feedback.error #next,#message.error{color:var(--error-color,#db4437)}#message.error{font-weight:600}
       #next{font-size:22px;font-weight:600;margin:6px 0;overflow-wrap:anywhere}#message{line-height:1.5;margin-top:10px}
       textarea{box-sizing:border-box;width:100%;min-height:150px;resize:vertical;padding:12px;border:1px solid var(--divider-color);border-radius:8px;background:var(--card-background-color);color:inherit;font:inherit}
       label{display:block;margin:10px 0}.buttons{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}button{padding:11px 15px;border:1px solid var(--divider-color);border-radius:8px;background:var(--secondary-background-color);color:inherit;font:inherit;cursor:pointer}
@@ -343,7 +344,7 @@ class NfcCardEnroller extends HTMLElement {
       <small>Titles are fetched from Spotify when enrollment starts. Optional: Custom title | Link. Album links play the entire album.</small>
       </section>
       <div class="buttons"><button data-action="start" class="primary">Start enrollment</button><button data-action="inspect">Inspect cards</button><button data-action="stop">Stop</button><button data-action="clear">Discard draft</button></div>
-      <div class="focus"><small id="count"></small><div id="next"></div><div id="message" role="status" aria-live="polite"></div></div>
+      <div class="focus" id="enrollment-feedback"><small id="count"></small><div id="next"></div><div id="message" role="status" aria-live="polite"></div></div>
       <section class="focus" aria-live="polite"><small>Last scanned card</small><div id="last-card"></div></section>
       <div id="conflict" hidden><div id="conflict-text"></div><button data-action="replace">Replace this card assignment</button></div>
       <div id="queue"></div><div class="buttons"><button data-action="save" class="primary">Save batch</button><button data-action="undo">Undo last assignment</button></div>
@@ -391,6 +392,10 @@ class NfcCardEnroller extends HTMLElement {
     const staged=this.rows.find(r=>r.uid===this.lastUid),saved=this.map?.[this.lastUid];
     el('last-card').innerHTML=this.lastUid?`<strong>${escapeHtml(this.lastUid)}</strong><div>${staged?`In batch: ${escapeHtml(staged.name)} · ${kindLabel(staged)}`:''}</div><div>${saved?`Saved: ${escapeHtml(saved.name)} · ${kindLabel(saved)}`:staged?'Not saved yet':'Not assigned yet'}</div>`:'No card scanned yet.';
     el('message').textContent=this.message;el('saved-message').textContent=this.message;
+    const actionFailed=!!this.actionError&&this.actionError.message===this.message;
+    el('enrollment-feedback').classList.toggle('error',actionFailed);el('message').classList.toggle('error',actionFailed);
+    el('message').setAttribute('role',actionFailed?'alert':'status');el('message').setAttribute('aria-live',actionFailed?'assertive':'polite');
+    if(actionFailed){el('next').textContent=this.actionError.action==='start'?'Enrollment not started':'Action failed';el('message').textContent='Error: '+this.message;}
     el('saved-last-card').innerHTML=this.checking&&this.active?el('last-card').innerHTML:'';
     const selectedTab=this.tab||'learn';el('panel-learn').hidden=selectedTab!=='learn';el('panel-saved').hidden=selectedTab!=='saved';el('panel-config').hidden=selectedTab!=='config';
     el('active-reader').disabled=this.active||this.busy;el('profile-message').textContent=this.profileMessage||'';
