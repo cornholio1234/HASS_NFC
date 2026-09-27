@@ -55,15 +55,19 @@ the CAD. The supplied STL files use the dimensions above.
 ## Printing
 
 The STL orientations are ready for printing: base floor down, cover roof down.
-PLA, 0.4 mm nozzle, 0.2 mm layers, four perimeters and 20–30% infill.
+PLA, 0.4 mm nozzle, 0.2 mm layers, six perimeters, six top/bottom layers and 30% infill.
 Both parts occupy a 200 × 82 mm rectangle before brim or skirt.
 
 ![Print layout](print-layout.png)
 
 Sloping PCB clip shoulders limit the final horizontal hook projection to 0.8 mm.
 The housing latch shoulders project 1.02 mm; side windows bridge 9.2 mm.
-The USB cutout is open in the printing direction. PCB clips have 8 mm-wide,
-1.6 mm-thick leaves and a nominal 1.6 mm capture height. Housing latches have
+The USB cutout is open in the printing direction. PCB clips have 12 mm-wide
+leaves for the ESP32 and 10 mm-wide leaves for the RC522. Leaf thickness is
+2.4 mm, increasing to 3.2 mm at the root. Flared 5.2 mm-deep feet and curved
+longitudinal gussets join the 3.6 mm floor. The taper extends through the lower
+12 mm of each leaf; the upper length remains flexible. Capture height is 1.6 mm.
+Housing latches also have flared feet, while retaining their 1.6 mm leaves and
 0.6 mm nominal deflection and 0.2 mm vertical retaining clearance.
 
 ## Verification and rebuild

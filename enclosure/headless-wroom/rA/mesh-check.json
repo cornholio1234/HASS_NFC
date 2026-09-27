@@ -7,7 +7,7 @@
       82.0,
       43.8
     ],
-    "volume_mm3": 42669.41001335708
+    "volume_mm3": 54590.87287716108
   },
   "cover": {
     "watertight": true,
@@ -17,7 +17,7 @@
       82.0,
       41.6
     ],
-    "volume_mm3": 42195.54530853913
+    "volume_mm3": 42195.5453085391
   },
   "assembled_shell_overlap_mm3": 0.0,
   "esp_pcb": {
@@ -33,12 +33,12 @@
     ],
     "overlap_mm3": 0.0,
     "retention_contacts_at_0_1_mm_translation": {
-      "x-1": 0.12214402062818408,
-      "x+1": 0.12214787624543533,
+      "x-1": 0.18321603094227612,
+      "x+1": 0.183221814368153,
       "y-1": 0.2327993911748424,
       "y+1": 1.6800368499389151,
       "z-1": 28.000106811523438,
-      "z+1": 2.559960021986626
+      "z+1": 3.839940032979939
     }
   },
   "esp_components_and_buttons": {
@@ -106,12 +106,12 @@
     ],
     "overlap_mm3": 0.0,
     "retention_contacts_at_0_1_mm_translation": {
-      "x-1": 0.12214169092476368,
-      "x+1": 0.12214169092476368,
+      "x-1": 0.1526771136559546,
+      "x+1": 0.1526771136559546,
       "y-1": 0.9600042724632658,
       "y+1": 1.9199719238094985,
       "z-1": 4.7999267578125,
-      "z+1": 2.5599645995534956
+      "z+1": 3.1999557494418696
     }
   },
   "rc522_components": {
@@ -148,6 +148,13 @@
     "pcb_clips_per_board": 4,
     "pcb_thickness_mm": 1.6,
     "roof_minimum_mm": 1.3,
+    "floor_mm": 3.6,
+    "pcb_clip_leaf_mm": 2.4,
+    "pcb_clip_root_mm": 3.2,
+    "pcb_clip_widths_mm": {
+      "esp32": 12,
+      "rc522": 10
+    },
     "latch_deflection_mm": 0.6,
     "latch_vertical_clearance_mm": 0.2,
     "pcb_clamping_preload_mm": 0

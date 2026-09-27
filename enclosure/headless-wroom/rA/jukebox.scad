@@ -3,7 +3,7 @@
 // Dimensions are millimetres. Electronics are illustrative keepout models.
 part = "assembly"; // base, cover, plate, assembly, exploded, inside, base_check, cover_check
 W=96; D=82; H=46;
-wall=2.4; floor_t=2.4; seam=4.4; roof=1.6;
+wall=2.4; floor_t=3.6; seam=4.4; roof=1.6;
 eps=0.02; radius=4;
 esp_x=10; esp_y=7; esp_w=27.94; esp_l=48.26; esp_z=29.6; pcb_t=1.6;
 rc_x=48; rc_y=10; rc_w=40; rc_l=60; rc_z=40.8;
@@ -23,15 +23,27 @@ module latch(y){
   // The flat lower shoulder carries lid pull. The upper ramp guides closure.
   box(2.8,y,floor_t-eps,1.6,clip_w,clip_top-floor_t+eps);
   xz_shape([[4.38,2.3],[7,2.3],[4.38,5.5]],y,clip_w);
+  hull(){box(2.8,y-2,2.3,4.2,clip_w+4,.2);
+         box(2.8,y,5.6,1.6,clip_w,.2);}
   xz_shape([[2.82,23.2],[1.8,23.2],[1.8,24.8],[2.82,25.82]],y,clip_w);
 }
 
 // PCB clips are separate from their supporting posts, leaving the full leaf
 // length available to flex. Positive shoulders capture the PCB side edges.
-module pcb_clip(edge,y,z,inward,width=8){
+module pcb_clip(edge,y,z,inward,width=12){
   translate([edge,y,0])scale([inward,1,1]){
-    box(-3,0,floor_t-eps,1.6,width,z+pcb_t+1.4-floor_t+eps);
-    xz_shape([[-1.42,2.3],[.6,2.3],[-1.42,5]],0,width);
+    // 2.4 mm leaf, widening smoothly to a 3.2 mm root over the lower 12 mm.
+    box(-3.8,0,floor_t-eps,2.4,width,z+pcb_t+1.4-floor_t+eps);
+    xz_shape([[-4.6,2.3],[-1.4,2.3],[-1.4,12],[-3.8,12]],0,width);
+    // Broad foot stays below the wire-bend envelope (starts at Z=6).
+    hull(){
+      box(-4.6,-2,2.3,5.2,width+4,.2);
+      box(-3.8,0,5.6,2.4,width,.2);
+    }
+    // Rounded longitudinal root transitions spread load into the floor.
+    for(back=[false,true])translate([0,back ? width:0,0])scale([1,back ? -1:1,1])
+      rotate([0,0,-90])xz_shape([[0,2.3],[4,2.3],[3.8,3],[3.3,4],
+                                [2.5,5],[1.6,6],[.7,7],[0,9]],-4.6,3.2);
     // Sloped underside builds out towards the edge without a broad overhang.
     xz_shape([[-1.42,z-.02],[0,z+pcb_t-.02],
               [0,z+pcb_t+.02],[-1.42,z+pcb_t+.02]],0,width);
@@ -41,7 +53,7 @@ module pcb_clip(edge,y,z,inward,width=8){
 }
 module pcb_mounts(){
   for(y=[24,44])box(17,y,floor_t-eps,14,10,esp_z-floor_t+eps);
-  for(y=[20,44]){
+  for(y=[18,42]){
     pcb_clip(esp_x,y,esp_z,1);
     pcb_clip(esp_x+esp_w,y,esp_z,-1);
   }
@@ -53,9 +65,9 @@ module pcb_mounts(){
 
   // RC522 underside support: 2 mm of the bare long PCB edges.
   for(x=[46,86])for(y=[34,64])box(x,y,floor_t-eps,4,6,rc_z-floor_t+eps);
-  for(y=[12,51]){
-    pcb_clip(rc_x,y,rc_z,1);
-    pcb_clip(rc_x+rc_w,y,rc_z,-1);
+  for(y=[11,49]){
+    pcb_clip(rc_x,y,rc_z,1,10);
+    pcb_clip(rc_x+rc_w,y,rc_z,-1,10);
   }
   for(x=[48,84])box(x,7,floor_t-eps,4,3,rc_z+1.2-floor_t+eps);
   box(60,rc_y+rc_l,floor_t-eps,16,1.6,rc_z+1.2-floor_t+eps);

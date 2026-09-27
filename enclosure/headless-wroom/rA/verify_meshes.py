@@ -84,6 +84,8 @@ for dz in np.arange(0,50.01,1):
 assert worst < .001, worst
 report["cover_lift_after_latch_release"] = {"sampled_positions":51,"maximum_overlap_mm3":worst}
 report["mounting"] = {"pcb_clips_per_board":4,"pcb_thickness_mm":1.6,"roof_minimum_mm":1.3,
+                      "floor_mm":3.6,"pcb_clip_leaf_mm":2.4,"pcb_clip_root_mm":3.2,
+                      "pcb_clip_widths_mm":{"esp32":12,"rc522":10},
                       "latch_deflection_mm":.6,"latch_vertical_clearance_mm":.2,
                       "pcb_clamping_preload_mm":0}
 report["scope"] = "Nominal geometry and clearance checks. Printed clip fit, retention force and hardware fit require a physical assembly."
