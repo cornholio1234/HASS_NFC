@@ -23,7 +23,7 @@
   "sequence": [
     {
       "condition": "template",
-      "value_template": "{{ profile and command in allowed and state_attr(player, 'source') == profile.get('source') }}"
+      "value_template": "{{ profile and command in allowed and ((profile.get('backend', 'spotify') == 'music_assistant' and states(player) not in ['unknown', 'unavailable']) or (profile.get('backend', 'spotify') == 'spotify' and state_attr(player, 'source') == profile.get('source'))) }}"
     },
     {
       "if": [

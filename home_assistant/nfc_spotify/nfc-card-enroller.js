@@ -265,13 +265,21 @@ class NfcCardEnroller extends HTMLElement {
     const known=new Set([...Object.keys(this.profiles),...(this.tags||[]).map(t=>t.device_id)]);
     const readers=this.devices.filter(d=>known.has(d.id)||/nfc|rfid|tag.reader/i.test(`${d.name} ${d.name_by_user} ${d.model}`));
     el('profile-device').innerHTML='<option value="">Select a reader</option>'+readers.map(d=>`<option value="${escapeHtml(d.id)}">${escapeHtml(d.name_by_user||d.name||d.id)}</option>`).join('');
-    el('profile-player').innerHTML='<option value="">Select a Spotify account</option>'+this.entities.filter(e=>e.platform==='spotify'&&!e.disabled_by&&e.entity_id.startsWith('media_player.')).map(e=>`<option value="${escapeHtml(e.entity_id)}">${escapeHtml(this._hass.states[e.entity_id]?.attributes.friendly_name||e.entity_id)}</option>`).join('');
+    el('profile-backend').onchange=()=>{this.profilePlayers();this.profileSources();};
     el('active-reader').onchange=()=>{this.persist();this.readerId=el('active-reader').value;this.loadReaderDraft();el('links').value='';this.lastUid=this._hass.states[this.profiles[this.readerId]?.last_uid_entity]?.state;this.loadProfile(this.readerId);};
     el('profile-player').onchange=()=>this.profileSources();
     el('new-profile').onclick=()=>this.loadProfile('');
     el('save-profile').onclick=()=>this.saveProfile();
     el('save-timeout').onclick=()=>this.saveTimeout();
     this.loadProfile(this.readerId);
+  }
+  profilePlayers(selected=''){
+    const el=id=>this.shadowRoot.querySelector('#'+id),ma=el('profile-backend').value==='music_assistant';
+    const platform=ma?'music_assistant':'spotify';
+    el('profile-player').innerHTML='<option value="">Select player</option>'+this.entities.filter(e=>e.platform===platform&&!e.disabled_by&&e.entity_id.startsWith('media_player.')).map(e=>`<option value="${escapeHtml(e.entity_id)}">${escapeHtml(this._hass.states[e.entity_id]?.attributes.friendly_name||e.entity_id)} (${escapeHtml(e.entity_id)})</option>`).join('');
+    el('profile-player').value=selected;
+    this.shadowRoot.querySelector('label[for=profile-player]').textContent=ma?'Music Assistant player':'Spotify player / account';
+    el('profile-source').hidden=ma;this.shadowRoot.querySelector('label[for=profile-source]').hidden=ma;el('ma-account-note').hidden=!ma;
   }
   profileSources(selected=''){
     const el=id=>this.shadowRoot.querySelector('#'+id);
@@ -283,7 +291,7 @@ class NfcCardEnroller extends HTMLElement {
   loadProfile(id){
     const el=n=>this.shadowRoot.querySelector('#'+n),p=this.profiles[id]||{};
     this.editProfileId=id;this.setupReaderId=null;el('profile-device').value=id;
-    el('profile-name').value=p.name||'';el('profile-player').value=p.player||'';
+    el('profile-name').value=p.name||'';el('profile-backend').value=p.backend||'spotify';this.profilePlayers(p.player||'');
     el('profile-kind').value=p.default_kind||'music';el('profile-shuffle').value=p.music_shuffle||'keep';
     this.timeoutEntities={};
     for(const mode of ['playing','idle']){
@@ -303,10 +311,11 @@ class NfcCardEnroller extends HTMLElement {
   }
   async saveProfile(){
     if(this.busy||this.active)return;
-    const el=n=>this.shadowRoot.querySelector('#'+n),id=el('profile-device').value,player=el('profile-player').value,source=el('profile-source').value,name=el('profile-name').value.trim();
-    if(!id||!name||!player||!source||/[{}]/.test(name+source)){this.profileMessage='Select a reader, name, Spotify account and speaker. Do not use curly braces.';this.render();return;}
+    const el=n=>this.shadowRoot.querySelector('#'+n),id=el('profile-device').value,backend=el('profile-backend').value||'spotify',player=el('profile-player').value,source=el('profile-source').value,name=el('profile-name').value.trim();
+    if(!id||!name||!player||(backend==='spotify'&&!source)||!['spotify','music_assistant'].includes(backend)||/[{}]/.test(name+source)){this.profileMessage='Select a reader, name, Spotify account and speaker. Do not use curly braces.';this.render();return;}
     if(!this.editProfileId&&this.profiles[id]){this.profileMessage='This reader is already paired. Select its existing profile.';this.render();return;}
-    if(!(this._hass.states[player]?.attributes.source_list||[]).includes(source)){this.profileMessage='The speaker is currently unavailable for this account.';this.render();return;}
+    if(backend==='spotify'&&!(this._hass.states[player]?.attributes.source_list||[]).includes(source)){this.profileMessage='The speaker is currently unavailable for this account.';this.render();return;}
+    if(!this.entities.some(e=>e.entity_id===player&&e.platform===backend&&!e.disabled_by)){this.profileMessage='Select a player from the chosen playback integration.';this.render();return;}
     if(this.leaseFor(id)>Date.now()/1000){this.profileMessage='This reader has an active enrollment session. End that session first.';this.render();return;}
     const firstSetup=!this.profiles[id];
     this.busy=true;this.render();
@@ -315,7 +324,7 @@ class NfcCardEnroller extends HTMLElement {
       if(JSON.stringify(current)!==JSON.stringify(this.profileBase))throw Error('Profiles have changed. Reload the page.');
       const related=this.entities.filter(e=>e.device_id===id&&!e.disabled_by);
       const previous=current.variables.profiles[id]||{};
-      const profile={...previous,name,player,source,default_kind:el('profile-kind').value,music_shuffle:el('profile-shuffle').value,
+      const profile={...previous,name,backend,player,source:backend==='spotify'?source:'',default_kind:el('profile-kind').value,music_shuffle:el('profile-shuffle').value,
         status_entity:previous.status_entity||related.find(e=>e.entity_id.startsWith('binary_sensor.')&&(e.original_device_class==='connectivity'||/connection|verbindung|status/.test(e.entity_id)))?.entity_id||'',
         last_uid_entity:previous.last_uid_entity||related.find(e=>/last_card_uid|letzte_karten_uid|last_tag|last_uid/.test(e.entity_id))?.entity_id||''};
       const updated=structuredClone(current);updated.variables.profiles[id]=profile;
@@ -370,6 +379,7 @@ class NfcCardEnroller extends HTMLElement {
       <div class="buttons"><button id="new-profile">Pair another reader</button></div>
       <label for="profile-device">NFC reader</label><select id="profile-device"></select>
       <label for="profile-name">Name</label><input id="profile-name" maxlength="80">
+      <label for="profile-backend">Playback through</label><select id="profile-backend"><option value="spotify">Spotify Connect</option><option value="music_assistant">Music Assistant</option></select><small id="ma-account-note" hidden>Spotify accounts and music providers are configured in Music Assistant. The Spotify account selector above does not apply to this mode.</small>
       <label for="profile-player">Spotify player / account</label><select id="profile-player"></select>
       <label for="profile-source">Target speaker</label><select id="profile-source"></select>
       <section id="timeout-settings"><label for="display-timeout-playing">Display off while playing (seconds; 0 = always on)</label><input id="display-timeout-playing" type="number" min="0" max="1800" step="10"><label for="display-timeout-idle">Display off while paused/stopped (seconds; 0 = always on)</label><input id="display-timeout-idle" type="number" min="0" max="1800" step="10"><button id="save-timeout">Save timeout</button></section>
@@ -417,7 +427,7 @@ class NfcCardEnroller extends HTMLElement {
     el('profile-device').hidden=!!this.editProfileId;this.shadowRoot.querySelector('label[for=profile-device]').hidden=!!this.editProfileId;el('reader-setup-id').textContent=`reader_id: ${this.editProfileId||''}`;
     el('timeout-settings').hidden=!this.timeoutEntities?.playing||!this.timeoutEntities?.idle;el('save-timeout').disabled=this.busy||this.active||Object.values(this.timeoutEntities||{}).some(entity=>!entity||['unavailable','unknown'].includes(this._hass.states[entity]?.state));
     el('save-profile').disabled=this.active||this.busy;
-    for(const field of ['profile-device','profile-name','profile-player','profile-source','profile-kind','profile-shuffle','new-profile'])el(field).disabled=this.active||this.busy||(field==='profile-device'&&!!this.editProfileId);
+    for(const field of ['profile-device','profile-name','profile-backend','profile-player','profile-source','profile-kind','profile-shuffle','new-profile'])el(field).disabled=this.active||this.busy||(field==='profile-device'&&!!this.editProfileId);
     for(const b of this.shadowRoot.querySelectorAll('[data-tab]'))b.setAttribute('aria-selected',String(b.dataset.tab===(this.tab||'learn')));
     el('title-editor').hidden=!this.editing;el('save-title').disabled=this.busy;el('cancel-title').disabled=this.busy;
     el('conflict').hidden=!this.candidate||!this.active;

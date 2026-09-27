@@ -28,13 +28,16 @@ template:
 
         {% set player = p.get(''player'', '''') %}
 
-        {% set match = state_attr(player, ''source'') == p.get(''source'') %}
+        {% set ma = p.get(''backend'', ''spotify'') == ''music_assistant'' %}
 
-        {% set data = dict(state=states(player) if match else ''idle'', matched=match, target=p.get(''source'', ''''), media_position=state_attr(player, ''media_position'')
-        if match else none, media_duration=state_attr(player, ''media_duration'') if match else none, media_position_updated_at=state_attr(player, ''media_position_updated_at'')
-        | string if match else none, media_title=state_attr(player, ''media_title'') if match else none, media_content_id=state_attr(player, ''media_content_id'')
-        if match else none, media_artist=state_attr(player, ''media_artist'') if match else none, entity_picture=state_attr(player, ''entity_picture'') if match else
-        none, source=state_attr(player, ''source'') if match else none) %}
+        {% set match = (states(player) not in [''unknown'', ''unavailable'']) if ma else (p.get(''backend'', ''spotify'') == ''spotify'' and state_attr(player, ''source'')
+        == p.get(''source'')) %}
+
+        {% set data = dict(state=states(player) if match else ''idle'', matched=match, target=(state_attr(player, ''friendly_name'') or player) if ma else p.get(''source'',
+        ''''), media_position=state_attr(player, ''media_position'') if match else none, media_duration=state_attr(player, ''media_duration'') if match else none,
+        media_position_updated_at=state_attr(player, ''media_position_updated_at'') | string if match else none, media_title=state_attr(player, ''media_title'') if
+        match else none, media_content_id=state_attr(player, ''media_content_id'') if match else none, media_artist=state_attr(player, ''media_artist'') if match
+        else none, entity_picture=state_attr(player, ''entity_picture'') if match else none, source=state_attr(player, ''source'') if match else none) %}
 
         {% set ns.items = ns.items + [(rid, data)] %}
 

@@ -74,13 +74,13 @@ console.log('PASS: scans and enrollment leases are isolated by selected reader.'
   assert.equal(failed[0].name,'');assert.ok(failed[0].nameError);
   await ctx.test.resolveNames(failed,async()=>'Loaded on retry');assert.equal(failed[0].name,'Loaded on retry');assert.ok(!failed[0].nameError);
   console.log('PASS: automatic title, manual override, failure visibility, retry.');
-  for(const [status,uid] of [['connection','last_card_uid'],['verbindung','letzte_karten_uid']]){
+  for(const backend of ['spotify','music_assistant']) for(const [status,uid] of [['connection','last_card_uid'],['verbindung','letzte_karten_uid']]){
     let profiles={variables:{profiles:{}}};
-    const fields={'profile-device':'reader-1','profile-player':'media_player.spotify_test',
+    const fields={'profile-backend':backend,'profile-device':'reader-1','profile-player':'media_player.spotify_test',
       'profile-source':'Office','profile-name':'Desk','profile-kind':'audiobook','profile-shuffle':'keep'};
     const pairing={busy:false,active:false,profiles:{},profileBase:structuredClone(profiles),
       shadowRoot:{querySelector:id=>({value:fields[id.slice(1)]})},
-      entities:[{device_id:'reader-1',entity_id:`binary_sensor.panel_${status}`},
+      entities:[{entity_id:'media_player.spotify_test',platform:backend},{device_id:'reader-1',entity_id:`binary_sensor.panel_${status}`},
                 {device_id:'reader-1',entity_id:`sensor.panel_${uid}`}],
       leaseFor:()=>0,render(){},buildProfiles(){},loadProfile(){},
       _hass:{states:{'media_player.spotify_test':{attributes:{source_list:['Office']}}},
@@ -90,6 +90,8 @@ console.log('PASS: scans and enrollment leases are isolated by selected reader.'
     assert.equal(profiles.variables.profiles['reader-1'].status_entity,`binary_sensor.panel_${status}`);
     assert.equal(profiles.variables.profiles['reader-1'].last_uid_entity,`sensor.panel_${uid}`);
     assert.equal(profiles.variables.profiles['reader-1'].default_kind,'audiobook');
+    assert.equal(profiles.variables.profiles['reader-1'].backend,backend);
+    assert.equal(profiles.variables.profiles['reader-1'].source,backend==='spotify'?'Office':'');
   }
   console.log('PASS: reader pairing detects English and legacy sensor entity names.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

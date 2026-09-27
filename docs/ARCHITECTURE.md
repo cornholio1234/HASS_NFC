@@ -8,12 +8,16 @@ flowchart LR
   A --> P[Reader profile: account and speaker]
   P --> C[Shared card library: UID, URI, title, type]
   C --> S[Native Spotify integration]
+  C --> M[Music Assistant integration]
+  M --> Q[Music Assistant player]
   S --> L[Spotify Connect speaker]
   P --> T[HA template: metadata per reader]
   S --> T
+  M --> T
   T --> D[ESP32 display]
   D --> B[Reader-specific button commands]
   B --> S
+  B --> M
 ```
 
 ## Files and active data
@@ -48,6 +52,20 @@ image URL provided by Home Assistant.
 Playback scripts run in parallel so different readers do not cancel one another.
 A Spotify account still represents one shared playback session: two profiles using
 the same account do not provide two independent streams.
+
+Profiles use `backend: spotify` (also the default for old profiles) or
+`backend: music_assistant`. Spotify profiles retain `player` plus a Connect `source`.
+Music Assistant profiles store the target MA entity in `player`; `source` is empty.
+They call `music_assistant.play_media` with a Spotify URL and `enqueue: replace`.
+Playback controls and metadata use that same MA entity, without a Spotify source
+comparison. Unavailable MA players are not treated as matched. Provider accounts
+and provider selection remain configured in Music Assistant. Audiobooks explicitly
+disable shuffle and wait up to ten seconds for MA to confirm before starting.
+
+For an existing installation, update the play-card and control script logic and
+the package runtime template along with the JavaScript. Preserve the live
+`variables.card_map` and reader profiles; do not overwrite them with empty repository
+templates. The installer intentionally does not replace existing scripts.
 
 ## Mapping safeguards
 

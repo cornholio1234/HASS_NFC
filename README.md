@@ -24,8 +24,11 @@ printing instructions before printing it.**
   supports touch wake without triggering playback controls. The office RGB LED
   cycles through rainbow colors during playback.
 
-**Music Assistant is not required.** Playback uses Home Assistant's native Spotify
-integration and Spotify Connect. A computer is needed for setup, not daily operation.
+**Music Assistant is optional.** In Configuration, each reader can use either
+Spotify Connect (account plus speaker) or Music Assistant (its target player).
+Music Assistant must have the Spotify provider configured to resolve the same card
+links. Its provider accounts are managed in Music Assistant. A computer is needed
+for setup, not daily operation.
 
 ## Hardware and requirements
 
