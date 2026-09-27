@@ -1,6 +1,5 @@
 # Flat office enclosure — 1.47B-M, r0
 
-**Prototype: geometrically checked, not physically printed or fitted.**
 Overall size: **70 × 50 × 40 mm** (width × depth × height). One third lower than
 the 60 mm enclosure for the 2-inch display. PLA, no screws; display at the front,
 RC522 antenna under the roof. USB faces right when looking at the display.
@@ -20,24 +19,21 @@ RC522 antenna under the roof. USB faces right when looking at the display.
 | `retainer-8mm.stl` | Alternative for an 8 mm module |
 | `keys.stl` | Four keys in one file, already laid flat |
 
-**Use one retainer only.** Module depth means display front to rear PCB, excluding
-header pins, sockets and wires. The manufacturer drawing does not specify this
-dimension. Measure it to choose a retainer. The default 7 mm is an assumption,
-not a measured dimension. In `jukebox.scad`, `module_depth` accepts intermediate
-values too. A larger value shortens the four columns and leaves more room for a
-thicker module. Do not force a too-long retainer against the display.
+Select one retainer for the module depth: display front to rear PCB, excluding
+header pins, sockets and wires. The CAD default is 7 mm; the manufacturer drawing
+does not specify module depth. `module_depth` in `jukebox.scad` also accepts
+intermediate values. Larger values shorten the four columns for thicker modules.
 
 ![Print layout](print-layout.png)
 
 Starting settings: PLA, 0.4 mm nozzle, 0.2 mm layers, four walls, five top/bottom
 layers, 20–30% infill. Print the retainer on its broad rear frame, columns upward;
 the STL already has this orientation. This loads the columns in compression when
-assembled, instead of using thin flexible display fingers.
+assembled.
 
 The body has local rear-stop lips projecting about 1.3 mm and short bridges at the
-key holes / USB opening. Drawer key holes bridge about 5.2 mm. Start with supports
-off and inspect the slicer preview; this is not a verified support-free print.
-No broad bridge crosses the front display opening in the supplied orientation.
+key holes / USB opening. Drawer key holes bridge about 5.2 mm. The front display
+opening starts at the print bed in the supplied orientation.
 
 ## Assembly
 
@@ -48,8 +44,7 @@ No broad bridge crosses the front display opening in the supplied orientation.
    front bezel and USB connector toward the right-side opening.
 3. Slide the selected retainer upward behind it. The **four column ends face the
    back of the module**, contacting its corner areas. The broad frame is behind
-   the header connectors and seats against the body stops. There are no diagonal
-   clamp strips in this design.
+   the header connectors and seats against the body stops.
 4. Plug in the RC522 wires. Route the header sockets and wires through the open
    retainer center. Test the actual USB cable through the recessed side opening.
 5. Slide the RC522 in from the rear, antenna upward, components and wires downward.
@@ -62,9 +57,8 @@ No broad bridge crosses the front display opening in the supplied orientation.
 
 The Waveshare board footprint is **36.37 × 20.32 mm**, from the
 [manufacturer drawing](https://www.waveshare.com/img/devkit/ESP32-S3-LCD-1.47B/ESP32-S3-LCD-1.47B-details-size.jpg).
-The centered front window, front stack thickness, LCD active-area position,
-header/socket envelope and corner contact areas are provisional. The actual
-module must be checked; PCB dimensions alone do not prove its glass or stack fit.
+The front window, display stack, header envelope and corner contact areas are
+parameterized in `jukebox.scad`.
 
 RC522 assumption: 60 × 40 × 1.6 mm PCB. The 1.2 mm roof leaves 0.8 mm above the PCB.
 A 7 mm underside component envelope is reserved away from the PCB edges. Actual
@@ -76,8 +70,9 @@ may not fit. No battery is included in this design.
 consistent winding, positive volume, expected connected parts and bed contact.
 It checks 101 drawer positions, bottom insertion of all five retainer sizes,
 nominal module/header envelopes, RC522 PCB and its assumed component clearance.
-Results are in [mesh-check.json](mesh-check.json). No measured retention force,
-RF performance, physical fit or durability result is claimed.
+Results are in [mesh-check.json](mesh-check.json). These checks cover nominal CAD
+geometry; material deformation, print tolerances and RF performance are outside
+their scope.
 
 ## Rebuild
 

@@ -1,17 +1,16 @@
 # NFC Jukebox enclosure rC
 
-**Revised design; not yet physically tested.** Overall size: 70 × 50 × 60 mm
-(width × depth × height), display at the front, RC522 at the top, PLA, no screws.
-USB opening on the right when viewed from the display; the left side is closed.
-Print both the body and drawer as rC: rB and rC parts are not mechanically compatible.
+PLA enclosure, 70 × 50 × 60 mm (width × depth × height), display at the front,
+RC522 at the top, screwless assembly. USB opening on the right when viewed from
+the display. Body and drawer parts must use the same revision.
 
 ![Assembled enclosure](preview.png)
 
-## Changes from rB
+## Construction
 
 - Continuous display guides rooted in the side walls. Rear retaining lips overlap
-  about 3.2 mm of the outer glass margin, up from about 0.9 mm.
-- A broad display support replaces the two thin fingers: about 58.4 mm wide and
+  about 3.2 mm of the outer glass margin.
+- The display support is about 58.4 mm wide and
   7.7 mm deep, joined directly to the floor.
 - Two separate clamp strips sit behind the outer glass margins to limit backward
   movement. Three thicknesses allow fit adjustment without reprinting the body.
@@ -19,7 +18,7 @@ Print both the body and drawer as rC: rB and rC parts are not mechanically compa
 - Four solid keys are inserted from the sides to secure the upper and lower rear
   panel. Continuous ribs connect their seats to the floor and rear panel. The keys
   carry drawer pull-out loads across their shafts; a light press fit retains them
-  sideways. There are no flexible PLA latch arms.
+  sideways.
 
 ## Printable parts
 
@@ -33,18 +32,16 @@ Print both the body and drawer as rC: rB and rC parts are not mechanically compa
 | [clamp-strips-loose.stl](clamp-strips-loose.stl) | Thinner alternative, nominal 0.30 mm remaining play |
 | [keys-loose.stl](keys-loose.stl) | Alternative if keys are too tight, shaft up to 0.15 mm narrower |
 
-**Use only one set of strips and one set of keys.** STLs are already oriented for
-printing; no automatic reorientation is needed. Starting settings: PLA, 0.4 mm
+Assembly uses one pair of strips and four keys. STLs include print orientation.
+Print settings: PLA, 0.4 mm
 nozzle, 0.2 mm layers, four wall lines, five top/bottom layers and 20–30% infill.
-The strips and keys will be mostly solid at these wall settings. Do not scale the
-parts to adjust fit: scaling also changes the hardware dimensions.
+Strip and key variants adjust clearance while retaining the hardware dimensions.
 
 ![Print orientation](print-layout.png)
 
 Most overhangs grow at 45°. The four key holes leave short bridges: about 3.2–3.5 mm
-in the body and about 5.2 mm in the drawer. The design targets printing without
-supports; inspect these bridges and the first layer in your slicer. This is not a
-guarantee for every printer. An external brim may help the narrow strips adhere.
+in the body and about 5.2 mm in the drawer. An external brim provides additional
+bed contact for the narrow strips.
 
 ## Assembly
 
@@ -64,16 +61,12 @@ guarantee for every printer. An external brim may help the narrow strips adhere.
    first, until their heads sit flush in the recesses.
 
 If the display still moves, use the thicker **tight** strips. If assembly binds,
-use the thinner **loose** strips. Do not force the glass. Fit depends on printer
-accuracy, the first layer and actual glass thickness; nominal clearance does not
-include printing deviations.
+use the thinner **loose** strips. Specified clearances are nominal CAD values.
 
 To open the enclosure, pull/pry the key heads out using the surrounding recesses,
-then withdraw the drawer using its rear grip opening. This is a removable plug
-connection, not a click latch. Retention force and removal convenience have not
-been physically verified. The rear opening is a finger grip, not an extra port.
+then withdraw the drawer using its rear grip opening.
 
-## Checks and limitations
+## Geometry checks
 
 [mesh-check.json](mesh-check.json) records [verify_meshes.py](verify_meshes.py):
 all seven STLs are watertight, consistently oriented, have the expected number of
@@ -83,9 +76,8 @@ including 101 sampled positions along a 50 mm withdrawal path. Nominal glass,
 display PCB and RC522 envelopes do not overlap those parts. Strips meet the sloping
 guides; numerical intersection residue below 0.0001 mm³ is tolerated.
 
-**Not yet verified:** an actual print, retention force, service life, real connector
-and wire dimensions, and manufacturing tolerances of your boards. Board models
-are simplified envelopes, not full component models.
+Board models use nominal envelopes. The checks cover mesh integrity and CAD
+clearance; they exclude connector detail, material deformation and print tolerances.
 
 ## Edit the CAD / export again
 

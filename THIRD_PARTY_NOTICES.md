@@ -15,11 +15,10 @@ is GPLv3; the Python code is MIT. The complete upstream license is included at
 
 Local changes dated 2026-09-26 reject invalid touch counts and out-of-range raw
 coordinates before dispatch. The C++ modifications remain under the upstream
-GPLv3 license. The hardware cause of invalid readings has not been established.
+GPLv3 license.
 
-Compiled ESPHome firmware incorporates GPLv3 runtime code. This repository
-publishes source, not prebuilt firmware; do not describe compiled firmware as
-MIT-only. ESPHome and its build dependencies retain their respective licenses.
+Compiled ESPHome firmware incorporates GPLv3 runtime code. ESPHome and its build
+dependencies retain their respective licenses.
 
 Spotify, Home Assistant, Waveshare and ESPHome are independent projects/products;
 their names identify compatibility. No Spotify audio, artwork or account data

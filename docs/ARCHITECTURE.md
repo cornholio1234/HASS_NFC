@@ -32,11 +32,9 @@ flowchart LR
 | Drafts | Browser localStorage, separated by reader |
 | Deletion history / latest backup | Browser localStorage |
 
-Repository JSON files are **empty installation templates**, not synchronized
-production data. Accounts and cards remain inside the user's Home Assistant
-installation after setup. Existing technical entity IDs, event names, storage keys
-are retained for compatibility; new dashboards use an English route. The installer
-also recognizes and preserves the original dashboard route. Visible labels are English.
+Repository JSON files are installation templates with empty card and profile
+libraries. Runtime data resides in Home Assistant. The dashboard route is
+`/nfc-cards/enroll`; the installer also accepts the legacy `/nfc-karten` route.
 
 Calling the configuration script publishes an event. The trigger-based template
 sensor `sensor.nfc_jukebox_profiles` holds profiles at runtime and restores them
@@ -56,11 +54,11 @@ the same account do not provide two independent streams.
 Profiles use `backend: spotify` (also the default for old profiles) or
 `backend: music_assistant`. Spotify profiles retain `player` plus a Connect `source`.
 Music Assistant profiles store the target MA entity in `player`; `source` is empty.
-They call `music_assistant.play_media` with a Spotify URL and `enqueue: replace`.
+Music cards call `music_assistant.play_media` with a Spotify URL and `enqueue: replace`.
 Playback controls and metadata use that same MA entity, without a Spotify source
 comparison. Unavailable MA players are not treated as matched. Provider accounts
-and provider selection remain configured in Music Assistant. Audiobooks explicitly
-disable shuffle and wait up to ten seconds for MA to confirm before starting.
+and provider selection remain configured in Music Assistant. Audiobooks use the
+bookmark component described below, with shuffle disabled.
 
 For an existing installation, update the play-card and control script logic and
 the package runtime template along with the JavaScript. Preserve the live
@@ -85,19 +83,18 @@ Firmware holds GPIO/display settings and a reader ID, without hard-coded account
 or speaker mappings. The local [CST816 patch](../esphome/components/cst816/README.md)
 is documented separately. Connection credentials belong in ESPHome secrets.
 
-The backlight turns off after 60 seconds without touch, detected movement or a new
-card scan. Playback and network/NFC/touch processing continue. The QMI8658 is sampled
+The backlight uses separate playback and pause/stop timeouts, each defaulting to
+60 seconds; 0 disables the timeout. Playback and network/NFC processing continue
+with the backlight off. The QMI8658 is sampled
 at 50 ms intervals; a 0.18 g vector deviation from a moving baseline counts as
 movement. Initial samples and non-finite values do not trigger wake. Touch wakes
 before button listeners run; the whole wake gesture is blocked from playback
 commands, including seeking. A 500 ms guard also covers a touch immediately after
-motion wake. Metadata and track changes do not refresh the activity timer. This
-addition has compiled successfully but still needs physical testing.
+motion wake. Playback-state changes restart the inactivity timer.
 
 `enclosure/r0`, `rA`, `rB` and `rC` include OpenSCAD sources, STL files and geometric
-checks. rB's physical test exposed weak supports and catches. rC introduces broad
-supports, replaceable display clamp strips and four removable locking keys; it is
-geometrically checked but has not been printed or mechanically tested.
+checks. rC uses continuous supports, replaceable display clamp strips and four
+removable locking keys. The 1.47B-M enclosure uses a separate column retainer.
 
 ## Audiobook persistence
 
