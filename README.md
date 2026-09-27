@@ -47,8 +47,7 @@ speaker profiles and card mappings are configured locally.
 Two firmware variants are available:
 
 - **2-inch touch reader:** playback controls, progress seeking and audiobook choices.
-- **1.47B-M office reader, without controls:** [pinout, firmware and setup](docs/OFFICE_147B.md),
-  plus a [70 × 50 × 40 mm screwless enclosure](enclosure/office-147b/r0/README.md).
+- **1.47B-M office reader, without controls:** [pinout, firmware and setup](docs/OFFICE_147B.md).
 
 Hardware requirements:
 

@@ -82,12 +82,6 @@ Set **Audiobook resume → Continue automatically** in this reader profile. Save
 chapters resume automatically; restart the active audiobook from the dashboard
 Enroll tab. Bookmarks are stored in Home Assistant.
 
-## Flat enclosure
-
-[CAD, STLs and assembly instructions](../enclosure/office-147b/r0/README.md).
-70 × 50 × 40 mm (width × depth × height), display front, card reader under the top.
-Retainers are available for module depths from 4 to 8 mm.
-
 ## Manufacturer references
 
 - [Board and interfaces](https://www.waveshare.com/wiki/ESP32-S3-LCD-1.47B)
