@@ -1,5 +1,7 @@
 # Headless ESP32-WROOM enclosure — r0
 
+Archived revision. Use [rA](../rA/README.md) for printed PCB clips and supports.
+
 **96 × 82 × 46 mm**, PLA, two printed parts. An AZ-Delivery ESP32 Dev Kit C V4
 sits on the base; an RC522 mounts beneath the card target on the cover.
 Four releasable latches connect the housing halves. Foam adhesive pads retain
