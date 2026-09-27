@@ -4,6 +4,10 @@ vm.createContext(ctx);vm.runInContext(fs.readFileSync(__dirname+'/nfc-card-enrol
 const {parseBatch,assign,escapeHtml}=ctx.test;
 const dated={old:{name:'Old',assigned_at:'2026-01-01T10:00:00Z'},fresh:{name:'Fresh',assigned_at:'2026-02-01T10:00:00Z'},legacy:{name:'Legacy'},invalid:{name:'Invalid',assigned_at:'bad'}};
 assert.equal(ctx.test.visibleCards(dated,'','newest')[0][0],'fresh');
+assert.equal(ctx.test.visibleCards(dated,'','date-asc')[0][0],'old');
+assert.equal(ctx.test.visibleCards(dated,'','date-desc')[0][0],'fresh');
+assert.equal(ctx.test.visibleCards(dated,'','title-desc')[0][0],'old');
+assert.equal(ctx.test.visibleCards(dated,'','id-desc')[0][0],'old');
 assert.equal(ctx.test.visibleCards(dated,'','oldest')[0][0],'old');
 assert.equal(ctx.test.visibleCards(dated,'','oldest')[1][0],'fresh');
 assert.equal(ctx.test.visibleCards(dated,'Fresh','newest').length,1);

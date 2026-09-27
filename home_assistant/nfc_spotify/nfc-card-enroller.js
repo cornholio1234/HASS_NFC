@@ -12,16 +12,17 @@ const visibleCards = (map,query='',sort='title') => {
   const needle=query.trim().toLocaleLowerCase('en');
   return Object.entries(map||{}).filter(([uid,r])=>`${uid} ${r.name} ${kindLabel(r)}`.toLocaleLowerCase('en').includes(needle))
     .sort((a,b)=>{
-      if(sort==='newest'||sort==='oldest'){
+      if(['newest','oldest','date-asc','date-desc'].includes(sort)){
         const ad=Date.parse(a[1].assigned_at||''),bd=Date.parse(b[1].assigned_at||'');
         const ak=Number.isFinite(ad),bk=Number.isFinite(bd);
         if(ak!==bk)return ak?-1:1;
-        if(ak&&ad!==bd)return sort==='newest'?bd-ad:ad-bd;
+        if(ak&&ad!==bd)return ['newest','date-desc'].includes(sort)?bd-ad:ad-bd;
         return a[0].localeCompare(b[0]);
       }
-      const key=sort==='id'?0:1;
-      const value=entry=>key===0?entry[0]:sort==='type'?kindLabel(entry[1]):entry[1].name;
-      return String(value(a)).localeCompare(String(value(b)),'en',{numeric:true,sensitivity:'base'})||a[0].localeCompare(b[0]);
+      const descending=sort.endsWith('-desc'),field=sort.replace(/-(asc|desc)$/,'');
+      const key=field==='id'?0:1;
+      const value=entry=>key===0?entry[0]:field==='type'?kindLabel(entry[1]):entry[1].name;
+      return (descending?-1:1)*String(value(a)).localeCompare(String(value(b)),'en',{numeric:true,sensitivity:'base'})||a[0].localeCompare(b[0]);
     });
 };
 const parseBatch = text => {
@@ -362,6 +363,7 @@ class NfcCardEnroller extends HTMLElement {
       button.primary{background:var(--primary-color);color:var(--text-primary-color)}button:disabled{opacity:.45;cursor:default}small{color:var(--secondary-text-color)}
       select{padding:8px;border:1px solid var(--divider-color);border-radius:6px;background:var(--card-background-color);color:inherit;font:inherit}
       .card-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0}.card-tools input{flex:1;min-width:180px;padding:10px;border:1px solid var(--divider-color);border-radius:6px;background:var(--card-background-color);color:inherit;font:inherit}
+      th button{border:0;background:transparent;padding:0;color:inherit;font:inherit;font-weight:600;white-space:nowrap}th button:hover{color:var(--primary-color)}
       .table-scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--divider-color);white-space:nowrap}th{color:var(--secondary-text-color);font-weight:500}.card-id{font-family:monospace}.card-name{max-width:340px;overflow:hidden;text-overflow:ellipsis}td button,td select{padding:6px 8px;font-size:13px}.delete{color:var(--error-color)}td .icon-action{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;border-radius:5px;background:transparent;text-decoration:none;font-size:22px;line-height:1}td .icon-action:hover{background:var(--secondary-background-color)}.icon-action svg{width:16px;height:16px;pointer-events:none}
       #panel-config select,#panel-config input{box-sizing:border-box;width:100%;padding:10px;background:var(--card-background-color);color:inherit;border:1px solid var(--divider-color);border-radius:6px;font:inherit}#panel-config small{display:block;margin-top:14px}
       .tabs{display:flex;gap:8px;border-bottom:1px solid var(--divider-color);margin:18px 0}.tabs button{border:0;border-radius:0;background:transparent}.tabs button[aria-selected="true"]{color:var(--primary-color);border-bottom:2px solid var(--primary-color)}#title-editor{padding:14px;background:var(--secondary-background-color);border-radius:8px;margin:12px 0}#edit-title{box-sizing:border-box;width:100%;padding:10px;background:var(--card-background-color);color:inherit;border:1px solid var(--divider-color);border-radius:6px;font:inherit}
@@ -381,8 +383,8 @@ class NfcCardEnroller extends HTMLElement {
       <div id="conflict" hidden><div id="conflict-text"></div><button data-action="replace">Replace this card assignment</button></div>
       <div id="queue"></div><div class="buttons"><button data-action="save" class="primary">Save batch</button><button data-action="undo">Undo last assignment</button></div>
       </section><section id="panel-saved" role="tabpanel" aria-labelledby="tab-saved" hidden><div class="buttons"><button data-action="inspect">Inspect cards</button><button data-action="stop">Stop</button></div><div id="saved-message" role="status" aria-live="polite"></div><div id="saved-last-card"></div><h2 id="existing-title">Saved cards</h2><div id="title-editor" hidden><label for="edit-title">Edit title</label><input id="edit-title" maxlength="160"><div class="buttons"><button id="save-title" class="primary">Save</button><button id="cancel-title">Cancel</button></div></div>
-      <div class="card-tools"><input id="card-search" type="search" aria-label="Search cards" placeholder="Search ID, title or type …"><label for="card-sort">Sort:</label><select id="card-sort"><option value="newest">Newest assignment first</option><option value="oldest">Oldest assignment first</option><option value="title" selected>Title A–Z</option><option value="id">Card ID</option><option value="type">Audiobook / Music</option></select><button id="restore-card" hidden>Undo deletion</button></div>
-      <small id="card-results"></small><div class="table-scroll"><table><thead><tr><th>ID</th><th>Title</th><th>Type</th><th colspan="3">Actions</th></tr></thead><tbody id="existing"></tbody></table></div></section>
+      <div class="card-tools"><input id="card-search" type="search" aria-label="Search cards" placeholder="Search ID, title or type …"><button id="restore-card" hidden>Undo deletion</button></div>
+      <small id="card-results"></small><div class="table-scroll"><table><thead><tr><th scope="col" aria-sort="none"><button data-sort="id">ID<span aria-hidden="true" data-sort-arrow></span></button></th><th scope="col" aria-sort="none"><button data-sort="title">Title<span aria-hidden="true" data-sort-arrow></span></button></th><th scope="col" aria-sort="none"><button data-sort="type">Type<span aria-hidden="true" data-sort-arrow></span></button></th><th scope="col" aria-sort="none"><button data-sort="date">Assigned<span aria-hidden="true" data-sort-arrow></span></button></th><th colspan="3">Actions</th></tr></thead><tbody id="existing"></tbody></table></div></section>
       <section id="panel-config" role="tabpanel" aria-labelledby="tab-config" hidden>
       <p>One pairing per reader. All readers share the card library. Independent simultaneous playback requires separate Spotify accounts.</p>
       <div class="buttons"><button id="new-profile">Pair another reader</button></div>
@@ -405,7 +407,7 @@ class NfcCardEnroller extends HTMLElement {
     this.shadowRoot.querySelector('#edit-title').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();this.shadowRoot.querySelector('#save-title').click();}if(e.key==='Escape'){this.editing=null;this.render();}});
     this.shadowRoot.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>this.run(b.dataset.action)));
     this.shadowRoot.querySelector('#card-search').addEventListener('input',e=>{this.search=e.target.value;this.render();});
-    this.shadowRoot.querySelector('#card-sort').addEventListener('change',e=>{this.sort=e.target.value;this.render();});
+    this.shadowRoot.querySelectorAll('[data-sort]').forEach(b=>b.addEventListener('click',()=>{const field=b.dataset.sort;this.sort=this.sort===field+'-asc'?field+'-desc':this.sort===field+'-desc'?'title':field+'-asc';this.render();}));
     this.shadowRoot.querySelector('#restore-card').addEventListener('click',()=>this.deleteCard(null,true));
     this.shadowRoot.querySelector('#existing').addEventListener('click',e=>{const button=e.target.closest('[data-delete]');if(button)this.deleteCard(button.dataset.delete);const edit=e.target.closest('[data-edit]');if(edit&&!this.busy){this.editing=edit.dataset.edit;this.shadowRoot.querySelector('#edit-title').value=this.map[this.editing].name;this.render();this.shadowRoot.querySelector('#edit-title').focus();}});
     this.shadowRoot.addEventListener('change',e=>{
@@ -445,9 +447,10 @@ class NfcCardEnroller extends HTMLElement {
     const entries=Object.entries(this.map||{});el('existing-title').textContent=`${entries.length} saved cards`;
     const visible=visibleCards(this.map,this.search,this.sort),locked=this.busy||this.active&&!this.checking;
     el('card-results').textContent=`${visible.length} of ${entries.length} cards`;
-    if(['newest','oldest'].includes(this.sort))el('card-results').textContent+=' · Cards without a recorded date appear last.';
+    if(['newest','oldest','date-asc','date-desc'].includes(this.sort))el('card-results').textContent+=' · Cards without a recorded date appear last.';
+    for(const b of this.shadowRoot.querySelectorAll('[data-sort]')){const active=this.sort===b.dataset.sort+'-asc'||this.sort===b.dataset.sort+'-desc',desc=this.sort?.endsWith('-desc');b.parentElement.setAttribute('aria-sort',active?(desc?'descending':'ascending'):'none');b.querySelector('[data-sort-arrow]').textContent=active?(desc?' ↓':' ↑'):'';}
     el('restore-card').hidden=!this.deleted?.length;el('restore-card').disabled=locked;
-    el('existing').innerHTML=visible.map(([uid,r])=>`<tr><td class="card-id">${escapeHtml(uid)}</td><td class="card-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${kindSelect(r,`data-saved-kind="${escapeHtml(uid)}" ${locked?'disabled':''}`)}</td><td><button class="icon-action" title="Edit title" aria-label="Edit title: ${escapeHtml(r.name)}" data-edit="${escapeHtml(uid)}" ${locked?'disabled':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m16 3 5 5-12 12H4v-5ZM14 5l5 5"/></svg></button></td><td><a class="icon-action" title="Open Spotify" aria-label="Open Spotify: ${escapeHtml(r.name)}" href="https://open.spotify.com/${escapeHtml(r.uri.split(':').slice(1).join('/'))}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 .1l3-3a5 5 0 0 0-7.1-7.1l-1.7 1.7M14 11a5 5 0 0 0-7-.1l-3 3a5 5 0 0 0 7.1 7.1l1.7-1.7"/></svg></a></td><td><button class="delete icon-action" title="Delete mapping" data-delete="${escapeHtml(uid)}" aria-label="Delete mapping: ${escapeHtml(r.name)} (${escapeHtml(uid)})" ${locked?'disabled':''}><span aria-hidden="true">×</span></button></td></tr>`).join('')||'<tr><td colspan="6">No matching cards.</td></tr>';
+    el('existing').innerHTML=visible.map(([uid,r])=>`<tr><td class="card-id">${escapeHtml(uid)}</td><td class="card-name" title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${kindSelect(r,`data-saved-kind="${escapeHtml(uid)}" ${locked?'disabled':''}`)}</td><td>${Number.isFinite(Date.parse(r.assigned_at||''))?escapeHtml(new Date(r.assigned_at).toLocaleString('en',{dateStyle:'short',timeStyle:'short'})):'Unknown'}</td><td><button class="icon-action" title="Edit title" aria-label="Edit title: ${escapeHtml(r.name)}" data-edit="${escapeHtml(uid)}" ${locked?'disabled':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m16 3 5 5-12 12H4v-5ZM14 5l5 5"/></svg></button></td><td><a class="icon-action" title="Open Spotify" aria-label="Open Spotify: ${escapeHtml(r.name)}" href="https://open.spotify.com/${escapeHtml(r.uri.split(':').slice(1).join('/'))}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 .1l3-3a5 5 0 0 0-7.1-7.1l-1.7 1.7M14 11a5 5 0 0 0-7-.1l-3 3a5 5 0 0 0 7.1 7.1l1.7-1.7"/></svg></a></td><td><button class="delete icon-action" title="Delete mapping" data-delete="${escapeHtml(uid)}" aria-label="Delete mapping: ${escapeHtml(r.name)} (${escapeHtml(uid)})" ${locked?'disabled':''}><span aria-hidden="true">×</span></button></td></tr>`).join('')||'<tr><td colspan="7">No matching cards.</td></tr>';
     for(const b of this.shadowRoot.querySelectorAll('[data-action]')){
       const a=b.dataset.action;
       b.disabled=this.busy||(['start','inspect'].includes(a)&&(this.active||!online))||(a==='stop'&&!this.active)||(a==='clear'&&(this.active||!this.rows.length))||(a==='save'&&(!this.active||this.checking||!this.rows.length||!!next))||(a==='undo'&&(this.checking&&this.active||!done));
