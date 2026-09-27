@@ -135,13 +135,13 @@ class NfcCardEnroller extends HTMLElement {
       localStorage.setItem(DRAFT+'-deleted',JSON.stringify(this.deleted));
       this.message=`${card.name} (${uid}): mapping ${restore?'restored':'deleted'}.`;
     }catch(e){this.message=e.message||'Change failed.';}
-    finally{this.busy=false;this.render();}
+    finally{this.savedMessage=this.message;this.busy=false;this.render();}
   }
   async saveKind(uid,kind,field='kind'){
     if(this.busy||this.active&&!this.checking)return;
     if(field==='name'){
       kind=String(kind).trim();
-      if(!kind||kind.length>160||/[{}]/.test(kind)){this.message='Enter a title of 1 to 160 characters without curly braces.';this.render();return;}
+      if(!kind||kind.length>160||/[{}]/.test(kind)){this.message='Enter a title of 1 to 160 characters without curly braces.';this.savedMessage=this.message;this.render();return;}
     }else if(field!=='kind'||!['music','audiobook'].includes(kind))return;
     this.busy=true;this.render();
     try{
@@ -157,7 +157,7 @@ class NfcCardEnroller extends HTMLElement {
       this.base=verified;this.map=verified.variables.card_map;
       this.editing=null;this.message=field==='name'?'Title saved.':`${this.map[uid].name}: ${kindLabel(this.map[uid])} saved.`;
     }catch(e){this.message=e.message||'Could not save the card type.';}
-    finally{this.busy=false;this.render();}
+    finally{this.savedMessage=this.message;this.busy=false;this.render();}
   }
   readerOnline(){const entity=this.profiles?.[this.readerId]?.status_entity;return !!this.profiles?.[this.readerId]&&(!entity||this._hass.states[entity]?.state==='on');}
   leaseUntil(){return Number(this._hass.states[SESSIONS]?.attributes.leases?.[this.readerId]||0);}
@@ -372,7 +372,7 @@ class NfcCardEnroller extends HTMLElement {
       a{color:var(--primary-color)}@media(max-width:500px){ha-card{padding:16px}.row{grid-template-columns:1fr}.buttons button{flex:1}}
     </style><ha-card>
       <h1>NFC Cards</h1><div class="tabs" role="tablist" aria-label="Card management"><button role="tab" id="tab-learn" data-tab="learn" aria-controls="panel-learn">Enroll</button><button role="tab" id="tab-saved" data-tab="saved" aria-controls="panel-saved">Saved cards</button><button role="tab" id="tab-config" data-tab="config" aria-controls="panel-config">Configuration</button></div>
-      <label for="active-reader">Reader</label><select id="active-reader" aria-label="Select a reader"></select><div class="status" id="status"></div>
+      <div id="reader-controls"><label for="active-reader">Reader</label><select id="active-reader" aria-label="Select a reader"></select><div class="status" id="status"></div></div>
       <section id="panel-learn" role="tabpanel" aria-labelledby="tab-learn"><p>Paste Spotify links, scan cards one at a time, then save the entire batch.</p><section id="entry"><label for="links">One Spotify link per line</label>
       <textarea id="links" placeholder="Paste Spotify links here – titles are loaded automatically"></textarea>
       <small>Titles are fetched from Spotify when enrollment starts. Optional: Custom title | Link. Album links play the entire album.</small>
@@ -382,7 +382,7 @@ class NfcCardEnroller extends HTMLElement {
       <section class="focus" aria-live="polite"><small>Last scanned card</small><div id="last-card"></div></section>
       <div id="conflict" hidden><div id="conflict-text"></div><button data-action="replace">Replace this card assignment</button></div>
       <div id="queue"></div><div class="buttons"><button data-action="save" class="primary">Save batch</button><button data-action="undo">Undo last assignment</button></div>
-      </section><section id="panel-saved" role="tabpanel" aria-labelledby="tab-saved" hidden><div class="buttons"><button data-action="inspect">Inspect cards</button><button data-action="stop">Stop</button></div><div id="saved-message" role="status" aria-live="polite"></div><div id="saved-last-card"></div><h2 id="existing-title">Saved cards</h2><div id="title-editor" hidden><label for="edit-title">Edit title</label><input id="edit-title" maxlength="160"><div class="buttons"><button id="save-title" class="primary">Save</button><button id="cancel-title">Cancel</button></div></div>
+      </section><section id="panel-saved" role="tabpanel" aria-labelledby="tab-saved" hidden><div id="saved-message" role="status" aria-live="polite" hidden></div><h2 id="existing-title">Saved cards</h2><div id="title-editor" hidden><label for="edit-title">Edit title</label><input id="edit-title" maxlength="160"><div class="buttons"><button id="save-title" class="primary">Save</button><button id="cancel-title">Cancel</button></div></div>
       <div class="card-tools"><input id="card-search" type="search" aria-label="Search cards" placeholder="Search ID, title or type …"><button id="restore-card" hidden>Undo deletion</button></div>
       <small id="card-results"></small><div class="table-scroll"><table><thead><tr><th scope="col" aria-sort="none"><button data-sort="id">ID<span aria-hidden="true" data-sort-arrow></span></button></th><th scope="col" aria-sort="none"><button data-sort="title">Title<span aria-hidden="true" data-sort-arrow></span></button></th><th scope="col" aria-sort="none"><button data-sort="type">Type<span aria-hidden="true" data-sort-arrow></span></button></th><th scope="col" aria-sort="none"><button data-sort="date">Assigned<span aria-hidden="true" data-sort-arrow></span></button></th><th colspan="3">Actions</th></tr></thead><tbody id="existing"></tbody></table></div></section>
       <section id="panel-config" role="tabpanel" aria-labelledby="tab-config" hidden>
@@ -426,13 +426,12 @@ class NfcCardEnroller extends HTMLElement {
     el('next').textContent=this.active?(this.checking?'Which card is this?':next?next.name:'All cards scanned'):this.rows.length?'Resume draft':'Ready to enroll';
     const staged=this.rows.find(r=>r.uid===this.lastUid),saved=this.map?.[this.lastUid];
     el('last-card').innerHTML=this.lastUid?`<strong>${escapeHtml(this.lastUid)}</strong><div>${staged?`In batch: ${escapeHtml(staged.name)} · ${kindLabel(staged)}`:''}</div><div>${saved?`Saved: ${escapeHtml(saved.name)} · ${kindLabel(saved)}`:staged?'Not saved yet':'Not assigned yet'}</div>`:'No card scanned yet.';
-    el('message').textContent=this.message;el('saved-message').textContent=this.message;
+    el('message').textContent=this.message;el('saved-message').textContent=this.savedMessage||'';el('saved-message').hidden=!this.savedMessage;
     const actionFailed=!!this.actionError&&this.actionError.message===this.message;
     el('enrollment-feedback').classList.toggle('error',actionFailed);el('message').classList.toggle('error',actionFailed);
     el('message').setAttribute('role',actionFailed?'alert':'status');el('message').setAttribute('aria-live',actionFailed?'assertive':'polite');
     if(actionFailed){el('next').textContent=this.actionError.action==='start'?'Enrollment not started':'Action failed';el('message').textContent='Error: '+this.message;}
-    el('saved-last-card').innerHTML=this.checking&&this.active?el('last-card').innerHTML:'';
-    const selectedTab=this.tab||'learn';el('panel-learn').hidden=selectedTab!=='learn';el('panel-saved').hidden=selectedTab!=='saved';el('panel-config').hidden=selectedTab!=='config';
+    const selectedTab=this.tab||'learn';el('reader-controls').hidden=selectedTab==='saved';el('panel-learn').hidden=selectedTab!=='learn';el('panel-saved').hidden=selectedTab!=='saved';el('panel-config').hidden=selectedTab!=='config';
     el('active-reader').disabled=this.active||this.busy;el('profile-message').textContent=this.profileMessage||'';
     el('reader-setup').hidden=this.setupReaderId!==this.editProfileId||!this.setupReaderId;
     el('profile-device').hidden=!!this.editProfileId;this.shadowRoot.querySelector('label[for=profile-device]').hidden=!!this.editProfileId;el('reader-setup-id').textContent=`reader_id: ${this.editProfileId||''}`;
